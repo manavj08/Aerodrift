@@ -1,0 +1,7 @@
+rich>=13.7,<14
+networkx>=3.2,<4
+pytest>=8.0,<9
+
+# Added in later weeks (kept here now so setup.bat installs everything once):
+# boto3          -> Week 1 (Person A's ingestion, mocked/sandboxed)
+# reportlab      -> Week 4 (PDF incident reports)
