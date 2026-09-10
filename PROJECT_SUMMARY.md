@@ -24,7 +24,7 @@ codegen/sandbox, PDF reports. Currently at Week 1, Day 1.
 ## Quick start
 ```
 setup.bat
-run.bat scan
+run.bat demo
 run_tests.bat
 ```
 

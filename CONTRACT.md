@@ -1,12 +1,15 @@
-# Data Contract — Locked Week 1, Day 3-4 Sync
+# Data Contract — Locked Week 1 (Day 3-4 sync, finalized Day 5)
 
 Agreed between Person A (ingestion), Person B (graph/drift), and
 Person C (remediation/CLI/reporting).
 
-> **Note:** This is Person C's working draft, written from the project
-> spec. Confirm the exact field names/types with A and B in your actual
-> sync meeting and update this file — it's the source of truth for
-> `codegen.py` (Week 3) and the dashboard (Week 2).
+**Status: LOCKED for Week 2 start.** Any change after this point must be
+re-communicated to all three engineers, since dashboard rendering,
+codegen, and the sandbox all depend on this shape.
+
+> Field names/types below follow the project spec. If your team's actual
+> sync meeting produced different field names, edit this section — this
+> file is the single source of truth for Week 2/3 code.
 
 ## 1. Drift object (from Person B)
 
@@ -52,3 +55,10 @@ call arguments.
 - [ ] Whether `offending_edge` can be `null` for non-edge drift types
 - [ ] Timestamp format/timezone convention
 - [ ] Error contract if a mock remediation method fails
+
+## 5. Sample data (for Week 1 dashboard preview)
+
+Person C's `aerodrift demo` command renders the dashboard against sample
+drift objects matching this shape (`aerodrift/cli/main.py::SAMPLE_DRIFTS`).
+Run `aerodrift demo` to preview the drifted state, or `aerodrift demo
+--healthy` for the no-drift state.

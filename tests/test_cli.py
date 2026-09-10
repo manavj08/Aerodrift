@@ -87,3 +87,17 @@ def test_cli_version_flag():
 def test_cli_requires_command():
     with pytest.raises(SystemExit):
         main([])
+
+
+def test_cli_demo_runs_with_drift(capsys):
+    exit_code = main(["demo"])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "AeroDrift" in captured.out
+
+
+def test_cli_demo_healthy_runs(capsys):
+    exit_code = main(["demo", "--healthy"])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "AeroDrift" in captured.out

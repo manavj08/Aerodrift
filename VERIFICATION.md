@@ -1,4 +1,20 @@
-# Verification — Week 1, Day 1–4
+# Verification — Week 1 (Day 1–5, complete)
+
+## Verified — Day 5
+
+- `aerodrift demo` renders the dashboard in the drifted state (visually
+  confirmed: red drift panel, sample resources listed).
+- `aerodrift demo --healthy` renders the healthy state.
+- `pytest -v` — **27/27 tests passed** (25 Day 1-4 tests retained + 2 new
+  `demo` command tests).
+
+## Not verified — Day 5
+
+- `CONTRACT.md` is marked locked per Person C's own workstream, but has
+  **not been confirmed in an actual meeting** with Person A and Person B
+  in this environment (no multi-person sync occurred here). Treat the
+  "locked" status as Person C's readiness checkpoint — still confirm
+  with your teammates before Week 2 work depends on it.
 
 ## Verified — Day 3-4
 

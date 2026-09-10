@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Day 5 (Week 1 — complete)
+- Added `aerodrift demo [--healthy]` CLI command — renders the dashboard
+  with sample drift data matching the contract shape.
+- `CONTRACT.md` marked locked for Week 2 start.
+- Expanded `tests/test_cli.py` with 2 new tests for `demo`.
+
 ## Day 3-4 (Week 1)
 - Added `CONTRACT.md` — drift object shape and mock remediation method
   signatures (draft, to be confirmed with Person A/B).

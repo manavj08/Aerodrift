@@ -12,6 +12,26 @@ import argparse
 import sys
 
 from aerodrift import __version__
+from aerodrift.cli.dashboard import render_shell
+
+SAMPLE_DRIFTS = [
+    {
+        "drift_id": "drift-001",
+        "type": "open_ingress",
+        "affected_node": "sg-0a1b2c3",
+        "offending_edge": {"source": "0.0.0.0/0", "target": "sg-0a1b2c3", "rule": "0.0.0.0/0:22/tcp"},
+        "severity": "critical",
+        "detected_at": "2026-09-10T09:00:00Z",
+    },
+    {
+        "drift_id": "drift-002",
+        "type": "public_db_exposure",
+        "affected_node": "db-prod-01",
+        "offending_edge": {"source": "0.0.0.0/0", "target": "db-prod-01", "rule": "0.0.0.0/0:5432/tcp"},
+        "severity": "critical",
+        "detected_at": "2026-09-10T09:01:00Z",
+    },
+]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -58,6 +78,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--output", default="incident_report.pdf", help="Output path for the PDF report"
     )
 
+    demo_p = subparsers.add_parser(
+        "demo", help="Render the dashboard with sample drift data (Week 1 preview)"
+    )
+    demo_p.add_argument(
+        "--healthy", action="store_true", help="Render the healthy (no-drift) state instead"
+    )
+
     return parser
 
 
@@ -85,6 +112,9 @@ def main(argv=None) -> int:
         )
     elif args.command == "report":
         print(f"[stub] report: would write to {args.output} — not implemented yet (Week 4).")
+    elif args.command == "demo":
+        drifts = [] if args.healthy else SAMPLE_DRIFTS
+        render_shell(drifts)
 
     return 0
 

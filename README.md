@@ -4,7 +4,18 @@ Agentic cloud topology & remediation engine. This repo covers **Person C's**
 individual assignment: CLI, Rich dashboard, AST-based code generator,
 sandboxed executor, and PDF incident reports.
 
-Status: **Week 1, Day 3-4 — data contract sync + dashboard polish.**
+Status: **Week 1, Day 5 — Week 1 complete.**
+
+## What's here (Day 5, additive to Day 3-4)
+
+- New CLI command: `aerodrift demo [--healthy]` — renders the dashboard
+  against sample drift data matching the locked contract shape. Useful
+  to preview the shell before Week 2's real data is wired in, and as a
+  quick smoke test for teammates.
+- `CONTRACT.md` marked **locked** — per your assignment's "End of Week 1:
+  data contract locked with both teammates" checkpoint. Update it only
+  with team agreement from here on.
+- Test suite expanded from 25 → 27 tests.
 
 ## What's here (Day 3-4, additive to Day 2)
 
@@ -76,12 +87,15 @@ pip install -r requirements.txt
 ```
 run.bat scan
 run.bat status
+run.bat demo
 ```
 
 Or manually:
 ```
 venv\Scripts\activate
 python -m aerodrift.cli.main scan
+python -m aerodrift.cli.main demo
+python -m aerodrift.cli.main demo --healthy
 ```
 
 ## Test
@@ -96,7 +110,7 @@ venv\Scripts\activate
 pytest -v
 ```
 
-Expected: **25 passed**.
+Expected: **27 passed**.
 
 ## Folder structure
 
@@ -134,9 +148,9 @@ command logic is thin.
 
 ## Data contract
 
-See **`CONTRACT.md`** — drift object shape and mock remediation method
-signatures. This is a draft based on the project spec; replace with the
-actual values agreed in your Day 3-4 sync with Person A and B.
+See **`CONTRACT.md`** — **locked** as of Week 1 close. Drift object shape
+and mock remediation method signatures. Week 2/3 code depends on this
+shape; changes after this point need team agreement.
 
 ## Troubleshooting
 
@@ -170,7 +184,15 @@ actual values agreed in your Day 3-4 sync with Person A and B.
 - [x] Dashboard split into independently-testable helper functions
 - [x] Expanded test suite (25 tests passing)
 
-## Remaining (Week 1, Day 5)
+## Completed (Day 5 — Week 1 done)
 
-- [ ] Confirm `CONTRACT.md` values with A & B in the actual sync meeting
-- [ ] Final Week 1 polish and commit
+- [x] `aerodrift demo` command for previewing the dashboard with sample data
+- [x] `CONTRACT.md` finalized/locked for Week 2
+- [x] Test suite (27 tests passing)
+
+## Remaining (Week 2)
+
+- [ ] Wire dashboard to Person B's real NetworkX graph output
+- [ ] Wire `scan`/`status` commands to live drift detection
+- [ ] Replace `aerodrift/graph/topology.py` placeholder with B's real module
+- [ ] Replace `aerodrift/ingestion/mock_aws.py` placeholder with A's real module
