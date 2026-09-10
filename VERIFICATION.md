@@ -1,4 +1,21 @@
-# Verification — Week 1, Day 1–2
+# Verification — Week 1, Day 1–4
+
+## Verified — Day 3-4
+
+- `build_layout(drifts=[])` renders the healthy state without error.
+- `build_layout(drifts=[{...}])` renders the drifted state without error.
+- Each dashboard helper (`_build_header`, `_build_topology_panel`,
+  `_build_drift_list_panel`, `_build_footer`) builds independently.
+- `pytest -v` — **25/25 tests passed** (16 Day 1-2 tests retained + 9 new
+  dashboard tests).
+
+## Not verified — Day 3-4
+
+- `CONTRACT.md` field names/types are a **draft based on the project
+  spec**, not confirmed with Person A/B in an actual meeting. Update the
+  file and re-verify against their real modules once available.
+- Dashboard drift-aware styling has not been visually reviewed against
+  real drift data (no real data exists yet — Week 2 work).
 
 ## Verified — Day 2
 

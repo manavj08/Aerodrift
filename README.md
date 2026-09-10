@@ -4,7 +4,23 @@ Agentic cloud topology & remediation engine. This repo covers **Person C's**
 individual assignment: CLI, Rich dashboard, AST-based code generator,
 sandboxed executor, and PDF incident reports.
 
-Status: **Week 1, Day 2 — CLI expansion.**
+Status: **Week 1, Day 3-4 — data contract sync + dashboard polish.**
+
+## What's here (Day 3-4, additive to Day 2)
+
+- **`CONTRACT.md`** — drift object shape (from Person B) and mock
+  remediation method signatures (from Person A), drafted per the project
+  spec. **Update this file with the actual agreed values from your real
+  sync meeting** — it's the source of truth Week 2/3 code depends on.
+- Dashboard shell rewritten to be drift-aware: `build_layout(drifts=...)`
+  now accepts a list of drift objects and switches header/footer/panel
+  styling between healthy (green) and drifted (red) states. Still no
+  live data source — Week 2 wires in Person B's real `detect_drift()`
+  output using the shape locked in `CONTRACT.md`.
+- Dashboard split into named helper functions (`_build_header`,
+  `_build_topology_panel`, `_build_drift_list_panel`, `_build_footer`)
+  so Week 2 can swap each piece independently.
+- Test suite expanded from 16 → 25 tests (9 new dashboard tests).
 
 ## What's here (Day 2, additive to Day 1)
 
@@ -80,7 +96,7 @@ venv\Scripts\activate
 pytest -v
 ```
 
-Expected: **16 passed**.
+Expected: **25 passed**.
 
 ## Folder structure
 
@@ -116,11 +132,11 @@ Stdlib, zero extra dependency, sufficient for the 4 stub commands this
 project needs. Can swap to `click`/`typer` later without much rework since
 command logic is thin.
 
-## Data contract (to finalize Week 1, Day 3-4 sync)
+## Data contract
 
-Not yet locked with Person B/A. Once agreed, document here:
-- Drift object shape (type, affected node, offending edge/rule)
-- Mock remediation method signatures (e.g. `revoke_security_group_ingress(sg_id, rule)`)
+See **`CONTRACT.md`** — drift object shape and mock remediation method
+signatures. This is a draft based on the project spec; replace with the
+actual values agreed in your Day 3-4 sync with Person A and B.
 
 ## Troubleshooting
 
@@ -147,7 +163,14 @@ Not yet locked with Person B/A. Once agreed, document here:
 - [x] Global `--verbose` / `--version` flags
 - [x] Expanded test suite (16 tests passing)
 
-## Remaining (Week 1, Days 3–5)
+## Completed (Day 3-4)
 
-- [ ] Day 3–4: sync with A & B, lock data contract
-- [ ] Day 5: finish dashboard shell polish, document contract
+- [x] `CONTRACT.md` drafted — drift object shape + mock remediation signatures
+- [x] Dashboard rewritten to be drift-aware (healthy vs drifted styling)
+- [x] Dashboard split into independently-testable helper functions
+- [x] Expanded test suite (25 tests passing)
+
+## Remaining (Week 1, Day 5)
+
+- [ ] Confirm `CONTRACT.md` values with A & B in the actual sync meeting
+- [ ] Final Week 1 polish and commit
