@@ -4,7 +4,19 @@ Agentic cloud topology & remediation engine. This repo covers **Person C's**
 individual assignment: CLI, Rich dashboard, AST-based code generator,
 sandboxed executor, and PDF incident reports.
 
-Status: **Week 1, Day 1 — project scaffolding.**
+Status: **Week 1, Day 2 — CLI expansion.**
+
+## What's here (Day 2, additive to Day 1)
+
+- CLI commands now take real arguments (the interface later weeks will
+  implement against), while command bodies remain stubs:
+  - `scan [--watch]`
+  - `status [--json]`
+  - `remediate --sg-id SG_ID --rule RULE [--dry-run]` (sg-id/rule required)
+  - `report [--output PATH]` (defaults to `incident_report.pdf`)
+  - `--verbose` / `-v` and `--version` global flags
+- Expanded test suite: 16 tests covering every flag and the
+  `remediate` required-argument validation (exit code 2 if missing).
 
 ## What's here (Day 1)
 
@@ -68,7 +80,7 @@ venv\Scripts\activate
 pytest -v
 ```
 
-Expected: **7 passed**.
+Expected: **16 passed**.
 
 ## Folder structure
 
@@ -128,8 +140,14 @@ Not yet locked with Person B/A. Once agreed, document here:
 - [x] Placeholder modules for A/B's parts
 - [x] Test suite (7 tests passing)
 
-## Remaining (Week 1, Days 2–5)
+## Completed (Day 2)
 
-- [ ] Day 2: expand CLI command handling if needed
+- [x] Real CLI argument surface for all 4 commands
+- [x] Validation for `remediate` required args
+- [x] Global `--verbose` / `--version` flags
+- [x] Expanded test suite (16 tests passing)
+
+## Remaining (Week 1, Days 3–5)
+
 - [ ] Day 3–4: sync with A & B, lock data contract
 - [ ] Day 5: finish dashboard shell polish, document contract

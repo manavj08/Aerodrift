@@ -1,6 +1,15 @@
-# Verification — Week 1, Day 1
+# Verification — Week 1, Day 1–2
 
-## Verified
+## Verified — Day 2
+
+- All 4 CLI commands accept and correctly handle their new flags
+  (`--watch`, `--json`, `--sg-id`/`--rule`/`--dry-run`, `--output`).
+- `remediate` without `--sg-id`/`--rule` exits with code 2 and prints an
+  error to stderr (validated, not just argparse's own error).
+- `--verbose` and `--version` global flags work.
+- `pytest -v` — **16/16 tests passed** (7 Day 1 tests retained + 9 new).
+
+## Verified — Day 1
 
 - `python -m venv venv` succeeds.
 - `pip install -r requirements.txt` succeeds (rich, networkx, pytest).
