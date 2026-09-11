@@ -1,4 +1,22 @@
-# Verification — Week 1 (Day 1–5, complete)
+# Verification — Week 1 (complete) + Week 2 Day 1
+
+## Verified — Week 2 Day 1
+
+- `aerodrift demo` visually confirmed: topology table shows 4 mock
+  resources, `sg-0a1b2c3` and `db-prod-01` render with red `DRIFTED`
+  status, others show green `healthy`.
+- `_build_topology_panel()` correctly falls back to "(no data yet)" when
+  `graph=None` or the graph is empty.
+- `pytest -v` — **34/34 tests passed** (27 Week 1 tests retained + 4 new
+  graph-placeholder tests + 3 new dashboard rendering tests).
+
+## Not verified — Week 2 Day 1
+
+- Rendering against Person B's **real** graph — only tested against
+  Person C's own placeholder mock graph. Behavior with B's actual node/
+  edge attribute names is unverified until B delivers and this file's
+  `build_mock_graph()` swap point is replaced.
+- Performance at scale (large graphs) — mock graph has only 4 nodes.
 
 ## Verified — Day 5
 

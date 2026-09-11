@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## Week 2, Day 1
+- `_build_topology_panel()` now renders real graph nodes/edges instead of
+  a placeholder row; drifted nodes highlighted red per `affected_node`
+  match against drift objects.
+- `build_layout()` / `render_shell()` gained a `graph` parameter.
+- Added `build_mock_graph()` to `aerodrift/graph/topology.py` placeholder
+  — swap point for Person B's real module.
+- `aerodrift demo` now shows the mock graph through real rendering.
+- Added `tests/test_graph_placeholder.py`; expanded `test_dashboard.py`.
+
 ## Day 5 (Week 1 — complete)
 - Added `aerodrift demo [--healthy]` CLI command — renders the dashboard
   with sample drift data matching the contract shape.

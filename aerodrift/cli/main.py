@@ -13,6 +13,7 @@ import sys
 
 from aerodrift import __version__
 from aerodrift.cli.dashboard import render_shell
+from aerodrift.graph.topology import build_mock_graph
 
 SAMPLE_DRIFTS = [
     {
@@ -114,7 +115,8 @@ def main(argv=None) -> int:
         print(f"[stub] report: would write to {args.output} — not implemented yet (Week 4).")
     elif args.command == "demo":
         drifts = [] if args.healthy else SAMPLE_DRIFTS
-        render_shell(drifts)
+        graph = build_mock_graph()
+        render_shell(graph=graph, drifts=drifts)
 
     return 0
 

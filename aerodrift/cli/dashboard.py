@@ -1,8 +1,9 @@
 """Rich dashboard rendering for AeroDrift.
 
 Week 1: layout shell only, no live data.
-Week 2: wired to Person B's NetworkX graph + drift output, per the
-locked data contract (see CONTRACT.md).
+Week 2: renders Person B's NetworkX graph + drift output, per the
+locked data contract (see CONTRACT.md). Currently wired against the
+placeholder graph in aerodrift/graph/topology.py until B delivers.
 """
 
 from datetime import datetime, timezone
@@ -25,29 +26,53 @@ def _build_header() -> Panel:
     return Panel(title, style="bold")
 
 
-def _build_topology_panel(drift_count: int = 0) -> Panel:
-    """Placeholder topology panel. Week 2 replaces the body with the
-    real graph render, using drift objects per CONTRACT.md to decide
-    which nodes render red (drifted) vs default (healthy).
+def _drifted_node_ids(drifts: list) -> set:
+    """Extract the set of affected_node ids from drift objects (per CONTRACT.md)."""
+    return {d["affected_node"] for d in drifts if d.get("affected_node")}
+
+
+def _build_topology_panel(graph=None, drifts: list | None = None) -> Panel:
+    """Render actual graph nodes as rows, highlighting drifted ones in red.
+
+    Args:
+        graph: a networkx.DiGraph (or None if no graph is available yet).
+        drifts: drift objects (per CONTRACT.md) used to mark rows red.
     """
+    drifts = drifts or []
+    drifted_ids = _drifted_node_ids(drifts)
+
     table = Table(show_header=True, header_style="bold", expand=True)
     table.add_column("Resource")
+    table.add_column("Type")
     table.add_column("Status")
-    table.add_row("(no data yet)", "—")
 
-    footer = Text(f"\n{drift_count} drifted resource(s)", style="red" if drift_count else "green")
-    return Panel(table, title="Topology", subtitle=str(footer) if drift_count else None)
+    if graph is None or graph.number_of_nodes() == 0:
+        table.add_row("(no data yet)", "—", "—")
+    else:
+        for node_id, attrs in graph.nodes(data=True):
+            resource_type = attrs.get("resource_type", "unknown")
+            if node_id in drifted_ids:
+                table.add_row(f"[red]{node_id}[/red]", resource_type, "[bold red]DRIFTED[/bold red]")
+            else:
+                table.add_row(node_id, resource_type, "[green]healthy[/green]")
+
+    footer = Text(f"\n{len(drifted_ids)} drifted resource(s)", style="red" if drifted_ids else "green")
+    return Panel(table, title="Topology", subtitle=str(footer) if drifted_ids else None)
 
 
 def _build_drift_list_panel(drifts: list | None = None) -> Panel:
-    """Placeholder drift list. Week 2 populates from Person B's
-    detect_drift() output (shape locked in CONTRACT.md).
+    """Drift list populated from Person B's detect_drift() output
+    (shape locked in CONTRACT.md).
     """
     drifts = drifts or []
     if not drifts:
-        body = Text("No drift data yet — coming Week 2.", style="dim")
+        body = Text("No drift detected.", style="dim green")
     else:
-        body = Text("\n".join(f"[{d.get('severity', '?')}] {d.get('type', '?')}" for d in drifts))
+        lines = [
+            f"[{d.get('severity', '?')}] {d.get('type', '?')} — {d.get('affected_node', '?')}"
+            for d in drifts
+        ]
+        body = Text("\n".join(lines), style="red")
     return Panel(body, title="Drift", border_style="red" if drifts else "grey50")
 
 
@@ -58,12 +83,12 @@ def _build_footer(status: str = STATUS_HEALTHY) -> Panel:
     return Panel(f"Status: {label}   |   Last checked: {now}", style=style)
 
 
-def build_layout(drifts: list | None = None) -> Layout:
+def build_layout(graph=None, drifts: list | None = None) -> Layout:
     """Return the dashboard layout.
 
     Args:
-        drifts: optional list of drift objects (see CONTRACT.md). Left
-            empty in Week 1 — Week 2 wires this to Person B's graph.
+        graph: optional networkx.DiGraph from Person B (placeholder for now).
+        drifts: optional list of drift objects (see CONTRACT.md).
     """
     drifts = drifts or []
     status = STATUS_DRIFTED if drifts else STATUS_HEALTHY
@@ -80,16 +105,16 @@ def build_layout(drifts: list | None = None) -> Layout:
     )
 
     layout["header"].update(_build_header())
-    layout["topology"].update(_build_topology_panel(drift_count=len(drifts)))
+    layout["topology"].update(_build_topology_panel(graph=graph, drifts=drifts))
     layout["drift_list"].update(_build_drift_list_panel(drifts))
     layout["footer"].update(_build_footer(status))
 
     return layout
 
 
-def render_shell(drifts: list | None = None) -> None:
+def render_shell(graph=None, drifts: list | None = None) -> None:
     """Print the dashboard once."""
-    console.print(build_layout(drifts))
+    console.print(build_layout(graph=graph, drifts=drifts))
 
 
 if __name__ == "__main__":

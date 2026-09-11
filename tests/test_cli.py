@@ -94,6 +94,7 @@ def test_cli_demo_runs_with_drift(capsys):
     captured = capsys.readouterr()
     assert exit_code == 0
     assert "AeroDrift" in captured.out
+    assert "db-prod-01" in captured.out
 
 
 def test_cli_demo_healthy_runs(capsys):
@@ -101,3 +102,4 @@ def test_cli_demo_healthy_runs(capsys):
     captured = capsys.readouterr()
     assert exit_code == 0
     assert "AeroDrift" in captured.out
+    assert "healthy" in captured.out

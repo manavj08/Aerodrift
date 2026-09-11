@@ -4,7 +4,26 @@ Agentic cloud topology & remediation engine. This repo covers **Person C's**
 individual assignment: CLI, Rich dashboard, AST-based code generator,
 sandboxed executor, and PDF incident reports.
 
-Status: **Week 1, Day 5 — Week 1 complete.**
+Status: **Week 2, Day 1 — real topology rendering.**
+
+## What's here (Week 2 Day 1, additive to Week 1)
+
+- **`_build_topology_panel()` now renders actual graph nodes** — walks a
+  NetworkX `DiGraph`'s nodes and shows resource name / type / status,
+  replacing the "(no data yet)" placeholder row. Drifted nodes (matched
+  by `affected_node` against drift objects, per `CONTRACT.md`) render in
+  red with a `DRIFTED` status; others show `healthy`.
+- `build_layout()` / `render_shell()` now take a `graph` parameter
+  alongside `drifts`.
+- **`aerodrift/graph/topology.py` placeholder expanded** with
+  `build_mock_graph()` — a small representative topology (internet → SG →
+  EC2 → DB, plus a simulated drift edge straight to the DB) so the
+  dashboard has real-shaped data to render. **This entire file is Person
+  B's responsibility — replace it wholesale once B delivers.**
+- `aerodrift demo` now renders the mock graph through the real topology
+  panel (previously just showed the drift list with an empty topology).
+- Test suite expanded from 27 → 34 tests (new `test_graph_placeholder.py`
+  covers the mock graph; `test_dashboard.py` covers real rendering).
 
 ## What's here (Day 5, additive to Day 3-4)
 
@@ -98,6 +117,9 @@ python -m aerodrift.cli.main demo
 python -m aerodrift.cli.main demo --healthy
 ```
 
+`demo` now shows a real (mock) topology table with drifted rows in red —
+run it to see Week 2's rendering work.
+
 ## Test
 
 ```
@@ -110,7 +132,7 @@ venv\Scripts\activate
 pytest -v
 ```
 
-Expected: **27 passed**.
+Expected: **34 passed**.
 
 ## Folder structure
 
@@ -190,9 +212,17 @@ shape; changes after this point need team agreement.
 - [x] `CONTRACT.md` finalized/locked for Week 2
 - [x] Test suite (27 tests passing)
 
+## Completed (Week 2, Day 1)
+
+- [x] Real topology rendering — dashboard walks actual graph nodes/edges
+- [x] Drift-to-red-highlighting wired end-to-end (`affected_node` match)
+- [x] Mock graph placeholder for standalone dev (`build_mock_graph()`)
+- [x] Test suite (34 tests passing)
+
 ## Remaining (Week 2)
 
-- [ ] Wire dashboard to Person B's real NetworkX graph output
-- [ ] Wire `scan`/`status` commands to live drift detection
-- [ ] Replace `aerodrift/graph/topology.py` placeholder with B's real module
-- [ ] Replace `aerodrift/ingestion/mock_aws.py` placeholder with A's real module
+- [ ] Replace `aerodrift/graph/topology.py` placeholder with Person B's
+      real module once delivered — swap point is `build_mock_graph()` /
+      `detect_drift()`
+- [ ] Wire `scan`/`status` commands to the real graph + live drift detection
+- [ ] Mid-project review: joint demo, drift detection under 5 seconds
