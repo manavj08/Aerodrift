@@ -4,7 +4,25 @@ Agentic cloud topology & remediation engine. This repo covers **Person C's**
 individual assignment: CLI, Rich dashboard, AST-based code generator,
 sandboxed executor, and PDF incident reports.
 
-Status: **Week 2, Day 2 — scan/status wired to real pipeline.**
+Status: **Week 2, Day 3 — real drift detection logic.**
+
+## What's here (Week 2 Day 3, additive to Day 2)
+
+- **`detect_drift()` placeholder is no longer a no-op.** It now does real
+  NetworkX path-finding from `0.0.0.0/0` to sensitive resources (currently:
+  `database` nodes) — the exact "is there a path from the Internet to
+  Database X?" use case from the project spec. `scan`/`status` now show
+  genuine drift on the mock graph **without needing `--demo-data`**.
+- Detects both direct exposure (`public_db_exposure` — internet edge
+  straight to the DB) and indirect exposure (`indirect_exposure` — DB
+  reachable via intermediate hops), reporting severity `critical` and a
+  contract-shaped drift object either way.
+- `--demo-data` is kept for testing against the fixed `SAMPLE_DRIFTS`
+  set, useful for consistent screenshots/demos independent of graph changes.
+- Added a performance test proving detection completes well under 5
+  seconds on a 500-node graph — relevant to the Week 2 mid-project
+  review checkpoint ("drift detection under 5 seconds").
+- Test suite expanded from 38 → 46 tests.
 
 ## What's here (Week 2 Day 2, additive to Day 1)
 
@@ -137,9 +155,9 @@ python -m aerodrift.cli.main scan --demo-data
 python -m aerodrift.cli.main status --demo-data
 ```
 
-**Note:** without `--demo-data`, `scan`/`status` show no drift — that's
-Person B's `detect_drift()` placeholder always returning `[]`, not a bug.
-Use `--demo-data` to see the drift-highlighting behavior today.
+**Note:** `scan`/`status` now show real detected drift by default (the
+mock graph's internet→DB edge). Use `--demo-data` if you want the fixed
+`SAMPLE_DRIFTS` set instead — e.g. for consistent screenshots.
 
 ## Test
 
@@ -153,7 +171,7 @@ venv\Scripts\activate
 pytest -v
 ```
 
-Expected: **38 passed**.
+Expected: **46 passed**.
 
 ## Folder structure
 
@@ -247,9 +265,18 @@ shape; changes after this point need team agreement.
 - [x] `status --json` returns real JSON drift data
 - [x] Test suite (38 tests passing)
 
+## Completed (Week 2, Day 3)
+
+- [x] Real `detect_drift()` — NetworkX path-finding, internet → sensitive resource
+- [x] Direct vs indirect exposure classification
+- [x] Performance verified (<5s on 500-node graph, mid-review checkpoint)
+- [x] Test suite (46 tests passing)
+
 ## Remaining (Week 2)
 
 - [ ] Replace `aerodrift/graph/topology.py` placeholder with Person B's
-      real module once delivered
+      real module once delivered — public function signatures match, so
+      the swap should not require dashboard/CLI changes
 - [ ] Implement `--watch` continuous re-scan loop
-- [ ] Mid-project review: joint demo, drift detection under 5 seconds
+- [ ] Mid-project review: joint demo (this repo's detection already meets
+      the <5s requirement on the placeholder; confirm against B's real graph)

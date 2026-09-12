@@ -28,19 +28,20 @@ def test_cli_scan_demo_data_shows_drift(capsys):
     assert "DRIFTED" in captured.out
 
 
-def test_cli_scan_without_demo_data_shows_no_drift(capsys):
-    # detect_drift() placeholder always returns [] until Person B delivers.
+def test_cli_scan_real_detection_finds_mock_graph_drift(capsys):
+    # Real detect_drift() now finds the mock graph's internet->DB edge.
     exit_code = main(["scan"])
     captured = capsys.readouterr()
     assert exit_code == 0
-    assert "healthy" in captured.out
+    assert "DRIFTED" in captured.out
 
 
 def test_cli_status_runs(capsys):
     exit_code = main(["status"])
     captured = capsys.readouterr()
     assert exit_code == 0
-    assert "No drift detected." in captured.out
+    assert "db-prod-01" in captured.out
+    assert "critical" in captured.out
 
 
 def test_cli_status_demo_data(capsys):
@@ -60,7 +61,21 @@ def test_cli_status_json_flag(capsys):
     assert data[0]["drift_id"] == "drift-001"
 
 
-def test_cli_status_json_empty(capsys):
+def test_cli_status_json_real_detection(capsys):
+    exit_code = main(["status", "--json"])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    data = json.loads(captured.out)
+    assert len(data) == 1
+    assert data[0]["affected_node"] == "db-prod-01"
+
+
+def test_cli_status_json_empty_with_no_path_graph(monkeypatch, capsys):
+    # Force an empty graph to verify the JSON-empty path still works.
+    import networkx as nx
+    from aerodrift.cli import main as main_module
+
+    monkeypatch.setattr(main_module, "build_mock_graph", lambda: nx.DiGraph())
     exit_code = main(["status", "--json"])
     captured = capsys.readouterr()
     assert exit_code == 0

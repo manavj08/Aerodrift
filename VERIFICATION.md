@@ -1,4 +1,32 @@
-# Verification — Week 1 (complete) + Week 2 Day 1-2
+# Verification — Week 1 (complete) + Week 2 Day 1-3
+
+## Verified — Week 2 Day 3
+
+- `detect_drift()` correctly identifies the mock graph's direct
+  internet→DB edge as `public_db_exposure`, confirmed both via unit
+  tests and visual dashboard inspection.
+- Indirect exposure (DB reachable via an intermediate hop, no direct
+  edge) correctly classified as `indirect_exposure`, reporting the first
+  hop as the offending edge.
+- Non-sensitive resources (e.g. `ec2`) reachable from the internet are
+  correctly NOT reported as drift (only `database` is in
+  `SENSITIVE_RESOURCE_TYPES` currently).
+- Graphs without the internet node, or with no path to any sensitive
+  node, correctly return `[]`.
+- **Performance**: detection on a 500-node synthetic graph completes in
+  well under 5 seconds (measured, not estimated) — satisfies the
+  Week 2 mid-project review checkpoint on the placeholder graph.
+- `pytest -v` — **46/46 tests passed** (38 Day 2 tests retained/updated +
+  8 new detection + performance tests).
+
+## Not verified — Week 2 Day 3
+
+- Performance against Person B's **real, potentially much larger**
+  cloud graph — only tested against a synthetic 500-node chain, not real
+  AWS-scale topology.
+- `SENSITIVE_RESOURCE_TYPES` currently only includes `database` — if the
+  real contract requires more resource types (e.g. S3 buckets, secrets
+  managers) as "sensitive," this needs updating once confirmed with B.
 
 ## Verified — Week 2 Day 2
 

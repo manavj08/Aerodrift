@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## Week 2, Day 3
+- `detect_drift()` placeholder is now real logic: NetworkX path-finding
+  from `0.0.0.0/0` to sensitive resources (`database` nodes).
+- Classifies drift as `public_db_exposure` (direct edge) or
+  `indirect_exposure` (reachable via intermediate hops).
+- `scan`/`status` now show genuine drift without `--demo-data`.
+- Added performance test: detection on a 500-node graph in <5s, per the
+  Week 2 mid-project review checkpoint.
+- Updated `tests/test_graph_placeholder.py` and `tests/test_cli.py` to
+  match real (non-empty) default detection output.
+
 ## Week 2, Day 2
 - `scan` and `status` wired to real `build_mock_graph()` +
   `detect_drift()` pipeline — no longer stub print statements.
