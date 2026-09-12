@@ -1,4 +1,23 @@
-# Verification — Week 1 (complete) + Week 2 Day 1
+# Verification — Week 1 (complete) + Week 2 Day 1-2
+
+## Verified — Week 2 Day 2
+
+- `scan` (no flags) renders the dashboard via the real pipeline, showing
+  all-healthy since `detect_drift()` placeholder returns `[]` — confirmed
+  visually.
+- `scan --demo-data` shows drifted rows in red — confirmed visually.
+- `status --demo-data` prints readable drift lines; `status --json
+  --demo-data` returns valid parseable JSON matching `SAMPLE_DRIFTS`.
+- `status --json` (no demo data) returns `[]`.
+- `pytest -v` — **38/38 tests passed** (34 Day 1 tests retained + 4 new
+  scan/status pipeline tests, replacing 2 stale stub-assertion tests).
+
+## Not verified — Week 2 Day 2
+
+- `--watch` continuous loop — not implemented, flag only prints a note.
+- Real drift detection end-to-end — still blocked on Person B's actual
+  `detect_drift()` implementation; today's wiring is verified only
+  against the placeholder (empty) and `--demo-data` paths.
 
 ## Verified — Week 2 Day 1
 

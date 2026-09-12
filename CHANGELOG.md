@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## Week 2, Day 2
+- `scan` and `status` wired to real `build_mock_graph()` +
+  `detect_drift()` pipeline — no longer stub print statements.
+- Added `--demo-data` flag to `scan`/`status` for testing drift
+  highlighting before Person B's real detection lands.
+- `status --json` returns real JSON, not a stub string.
+- `--watch` now prints an honest "not implemented" note instead of a
+  generic stub message.
+- Updated `tests/test_cli.py` — replaced 2 stale stub-assertion tests
+  with 6 real pipeline tests.
+
 ## Week 2, Day 1
 - `_build_topology_panel()` now renders real graph nodes/edges instead of
   a placeholder row; drifted nodes highlighted red per `affected_node`

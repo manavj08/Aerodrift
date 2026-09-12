@@ -9,11 +9,12 @@ against.
 """
 
 import argparse
+import json
 import sys
 
 from aerodrift import __version__
 from aerodrift.cli.dashboard import render_shell
-from aerodrift.graph.topology import build_mock_graph
+from aerodrift.graph.topology import build_mock_graph, detect_drift
 
 SAMPLE_DRIFTS = [
     {
@@ -55,12 +56,24 @@ def build_parser() -> argparse.ArgumentParser:
     scan_p.add_argument(
         "--watch", action="store_true", help="Continuously re-scan and refresh the dashboard"
     )
+    scan_p.add_argument(
+        "--demo-data",
+        action="store_true",
+        help="Use sample drift data instead of live detect_drift() output "
+        "(useful until Person B's real detection lands)",
+    )
 
     status_p = subparsers.add_parser(
         "status", help="Show current drift status (Week 2)"
     )
     status_p.add_argument(
         "--json", action="store_true", help="Output drift status as JSON instead of a table"
+    )
+    status_p.add_argument(
+        "--demo-data",
+        action="store_true",
+        help="Use sample drift data instead of live detect_drift() output "
+        "(useful until Person B's real detection lands)",
     )
 
     remediate_p = subparsers.add_parser(
@@ -97,11 +110,22 @@ def main(argv=None) -> int:
         print(f"[verbose] command: {args.command}")
 
     if args.command == "scan":
-        mode = "watch mode" if args.watch else "single scan"
-        print(f"[stub] scan ({mode}): dashboard rendering not implemented yet (Week 2).")
+        graph = build_mock_graph()
+        drifts = SAMPLE_DRIFTS if args.demo_data else detect_drift(graph)
+        if args.watch:
+            print("[stub] --watch: continuous re-scan loop not implemented yet.")
+        render_shell(graph=graph, drifts=drifts)
     elif args.command == "status":
-        fmt = "JSON" if args.json else "table"
-        print(f"[stub] status ({fmt}): drift status not implemented yet (Week 2).")
+        graph = build_mock_graph()
+        drifts = SAMPLE_DRIFTS if args.demo_data else detect_drift(graph)
+        if args.json:
+            print(json.dumps(drifts, indent=2))
+        else:
+            if not drifts:
+                print("No drift detected.")
+            else:
+                for d in drifts:
+                    print(f"[{d.get('severity', '?')}] {d.get('type', '?')} — {d.get('affected_node', '?')}")
     elif args.command == "remediate":
         if not args.sg_id or not args.rule:
             print("error: --sg-id and --rule are required", file=sys.stderr)

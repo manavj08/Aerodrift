@@ -1,4 +1,6 @@
-"""Tests for aerodrift.cli.main — Week 1 Day 2 CLI expansion."""
+"""Tests for aerodrift.cli.main — Week 2 Day 2 CLI expansion."""
+
+import json
 
 import pytest
 
@@ -9,28 +11,60 @@ def test_cli_scan_runs(capsys):
     exit_code = main(["scan"])
     captured = capsys.readouterr()
     assert exit_code == 0
-    assert "scan" in captured.out
+    assert "AeroDrift" in captured.out
 
 
-def test_cli_scan_watch_flag(capsys):
+def test_cli_scan_watch_flag_notes_not_implemented(capsys):
     exit_code = main(["scan", "--watch"])
     captured = capsys.readouterr()
     assert exit_code == 0
-    assert "watch mode" in captured.out
+    assert "not implemented" in captured.out
+
+
+def test_cli_scan_demo_data_shows_drift(capsys):
+    exit_code = main(["scan", "--demo-data"])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "DRIFTED" in captured.out
+
+
+def test_cli_scan_without_demo_data_shows_no_drift(capsys):
+    # detect_drift() placeholder always returns [] until Person B delivers.
+    exit_code = main(["scan"])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "healthy" in captured.out
 
 
 def test_cli_status_runs(capsys):
     exit_code = main(["status"])
     captured = capsys.readouterr()
     assert exit_code == 0
-    assert "status" in captured.out
+    assert "No drift detected." in captured.out
+
+
+def test_cli_status_demo_data(capsys):
+    exit_code = main(["status", "--demo-data"])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "critical" in captured.out
+    assert "sg-0a1b2c3" in captured.out
 
 
 def test_cli_status_json_flag(capsys):
+    exit_code = main(["status", "--json", "--demo-data"])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    data = json.loads(captured.out)
+    assert isinstance(data, list)
+    assert data[0]["drift_id"] == "drift-001"
+
+
+def test_cli_status_json_empty(capsys):
     exit_code = main(["status", "--json"])
     captured = capsys.readouterr()
     assert exit_code == 0
-    assert "JSON" in captured.out
+    assert json.loads(captured.out) == []
 
 
 def test_cli_remediate_requires_sg_and_rule(capsys):

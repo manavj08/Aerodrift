@@ -4,7 +4,25 @@ Agentic cloud topology & remediation engine. This repo covers **Person C's**
 individual assignment: CLI, Rich dashboard, AST-based code generator,
 sandboxed executor, and PDF incident reports.
 
-Status: **Week 2, Day 1 — real topology rendering.**
+Status: **Week 2, Day 2 — scan/status wired to real pipeline.**
+
+## What's here (Week 2 Day 2, additive to Day 1)
+
+- **`scan` and `status` are no longer stubs** — both now call
+  `build_mock_graph()` + `detect_drift()` and render real output through
+  the dashboard/drift-list panels. Because `detect_drift()` is still
+  Person B's placeholder (always returns `[]`), `scan`/`status` will
+  show "no drift" until B's real detection lands — this is expected and
+  documented, not a bug.
+- Added `--demo-data` flag to both `scan` and `status` — bypasses the
+  placeholder `detect_drift()` and uses `SAMPLE_DRIFTS` instead, so you
+  can see drift-highlighting behavior today without waiting on B.
+- `status --json` now returns real (empty, until B delivers) or demo
+  drift data as JSON, not a stub string.
+- `--watch` on `scan` prints an honest "not implemented yet" note — the
+  continuous re-scan loop itself is not built (out of scope for today;
+  flag exists for the future interface).
+- Test suite expanded from 34 → 38 tests.
 
 ## What's here (Week 2 Day 1, additive to Week 1)
 
@@ -105,20 +123,23 @@ pip install -r requirements.txt
 
 ```
 run.bat scan
+run.bat scan --demo-data
 run.bat status
+run.bat status --demo-data
+run.bat status --json
 run.bat demo
 ```
 
 Or manually:
 ```
 venv\Scripts\activate
-python -m aerodrift.cli.main scan
-python -m aerodrift.cli.main demo
-python -m aerodrift.cli.main demo --healthy
+python -m aerodrift.cli.main scan --demo-data
+python -m aerodrift.cli.main status --demo-data
 ```
 
-`demo` now shows a real (mock) topology table with drifted rows in red —
-run it to see Week 2's rendering work.
+**Note:** without `--demo-data`, `scan`/`status` show no drift — that's
+Person B's `detect_drift()` placeholder always returning `[]`, not a bug.
+Use `--demo-data` to see the drift-highlighting behavior today.
 
 ## Test
 
@@ -132,7 +153,7 @@ venv\Scripts\activate
 pytest -v
 ```
 
-Expected: **34 passed**.
+Expected: **38 passed**.
 
 ## Folder structure
 
@@ -219,10 +240,16 @@ shape; changes after this point need team agreement.
 - [x] Mock graph placeholder for standalone dev (`build_mock_graph()`)
 - [x] Test suite (34 tests passing)
 
+## Completed (Week 2, Day 2)
+
+- [x] `scan` and `status` wired to real graph + drift pipeline (no longer stubs)
+- [x] `--demo-data` flag on `scan`/`status` for testing without B's real detection
+- [x] `status --json` returns real JSON drift data
+- [x] Test suite (38 tests passing)
+
 ## Remaining (Week 2)
 
 - [ ] Replace `aerodrift/graph/topology.py` placeholder with Person B's
-      real module once delivered — swap point is `build_mock_graph()` /
-      `detect_drift()`
-- [ ] Wire `scan`/`status` commands to the real graph + live drift detection
+      real module once delivered
+- [ ] Implement `--watch` continuous re-scan loop
 - [ ] Mid-project review: joint demo, drift detection under 5 seconds
