@@ -4,7 +4,21 @@ Agentic cloud topology & remediation engine. This repo covers **Person C's**
 individual assignment: CLI, Rich dashboard, AST-based code generator,
 sandboxed executor, and PDF incident reports.
 
-Status: **Week 2, Day 3 — real drift detection logic.**
+Status: **Week 2, Day 4 — mid-project review rehearsal.**
+
+## What's here (Week 2 Day 4, additive to Day 3)
+
+- New CLI command: **`aerodrift mid-review-demo`** — scripts the exact
+  joint-demo flow from your assignment's Week 2 checkpoint: builds the
+  baseline topology, simulates an engineer opening a new security group
+  directly to the internet (fronting the database), detects the
+  resulting drift, times the detection, and renders the dashboard with
+  the newly-drifted resource shown in red. Single command, ready for the
+  review.
+- Dashboard/topology panel confirmed to correctly handle **multiple
+  simultaneous drifts** (not just the single DB-exposure case) — added
+  tests covering 2+ drifted resources rendering together.
+- Test suite expanded from 46 → 50 tests.
 
 ## What's here (Week 2 Day 3, additive to Day 2)
 
@@ -146,6 +160,7 @@ run.bat status
 run.bat status --demo-data
 run.bat status --json
 run.bat demo
+run.bat mid-review-demo
 ```
 
 Or manually:
@@ -153,10 +168,15 @@ Or manually:
 venv\Scripts\activate
 python -m aerodrift.cli.main scan --demo-data
 python -m aerodrift.cli.main status --demo-data
+python -m aerodrift.cli.main mid-review-demo
 ```
 
-**Note:** `scan`/`status` now show real detected drift by default (the
-mock graph's internet→DB edge). Use `--demo-data` if you want the fixed
+**For the Week 2 mid-project review**, run `mid-review-demo` — it walks
+through the full "drift a mock SG → detect → show red" flow in one
+command and prints the detection time.
+
+**Note:** `scan`/`status` show real detected drift by default (the mock
+graph's internet→DB edge). Use `--demo-data` if you want the fixed
 `SAMPLE_DRIFTS` set instead — e.g. for consistent screenshots.
 
 ## Test
@@ -171,7 +191,7 @@ venv\Scripts\activate
 pytest -v
 ```
 
-Expected: **46 passed**.
+Expected: **50 passed**.
 
 ## Folder structure
 
@@ -272,11 +292,17 @@ shape; changes after this point need team agreement.
 - [x] Performance verified (<5s on 500-node graph, mid-review checkpoint)
 - [x] Test suite (46 tests passing)
 
+## Completed (Week 2, Day 4)
+
+- [x] `mid-review-demo` command — scripted, timed joint-demo flow
+- [x] Dashboard verified correct with multiple simultaneous drifts
+- [x] Test suite (50 tests passing)
+
 ## Remaining (Week 2)
 
 - [ ] Replace `aerodrift/graph/topology.py` placeholder with Person B's
       real module once delivered — public function signatures match, so
       the swap should not require dashboard/CLI changes
 - [ ] Implement `--watch` continuous re-scan loop
-- [ ] Mid-project review: joint demo (this repo's detection already meets
-      the <5s requirement on the placeholder; confirm against B's real graph)
+- [ ] **Mid-project review**: run `mid-review-demo` live; confirm timing
+      and rendering hold up against Person B's real graph once available

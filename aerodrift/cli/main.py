@@ -11,10 +11,11 @@ against.
 import argparse
 import json
 import sys
+import time
 
 from aerodrift import __version__
 from aerodrift.cli.dashboard import render_shell
-from aerodrift.graph.topology import build_mock_graph, detect_drift
+from aerodrift.graph.topology import build_mock_graph, detect_drift, INTERNET_NODE
 
 SAMPLE_DRIFTS = [
     {
@@ -99,6 +100,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--healthy", action="store_true", help="Render the healthy (no-drift) state instead"
     )
 
+    subparsers.add_parser(
+        "mid-review-demo",
+        help="Scripted joint-demo flow: drift a mock SG, detect, show red, timed (Week 2 checkpoint)",
+    )
+
     return parser
 
 
@@ -141,8 +147,43 @@ def main(argv=None) -> int:
         drifts = [] if args.healthy else SAMPLE_DRIFTS
         graph = build_mock_graph()
         render_shell(graph=graph, drifts=drifts)
+    elif args.command == "mid-review-demo":
+        run_mid_review_demo()
 
     return 0
+
+
+def run_mid_review_demo() -> None:
+    """Scripted flow for the Week 2 mid-project review:
+    drift a mock SG -> detect under 5s -> Rich dashboard shows red.
+
+    Scenario (per the project spec): an engineer accidentally opens a
+    security group directly to the internet, creating a new path to the
+    production database. This mirrors "is there a path from the Internet
+    to Database X?" — the project's core use case.
+    """
+    print("Step 1/3: Building baseline topology...")
+    graph = build_mock_graph()
+    render_shell(graph=graph, drifts=detect_drift(graph))
+
+    print(
+        "\nStep 2/3: Simulating drift — an engineer opens a new security "
+        "group directly to the internet, which sits in front of the "
+        "database..."
+    )
+    # "Drift a mock SG": a new SG is opened to 0.0.0.0/0, and it fronts
+    # the database, creating a new internet -> DB path.
+    graph.add_node("sg-drift-demo", resource_type="security_group")
+    graph.add_edge(INTERNET_NODE, "sg-drift-demo", rule="0.0.0.0/0:0-65535/tcp")
+    graph.add_edge("sg-drift-demo", "db-prod-01", rule="internal")
+
+    print("Step 3/3: Detecting drift...")
+    start = time.monotonic()
+    drifts = detect_drift(graph)
+    elapsed = time.monotonic() - start
+    print(f"Detection completed in {elapsed:.3f}s (target: <5s)\n")
+
+    render_shell(graph=graph, drifts=drifts)
 
 
 if __name__ == "__main__":

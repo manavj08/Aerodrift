@@ -152,3 +152,24 @@ def test_cli_demo_healthy_runs(capsys):
     assert exit_code == 0
     assert "AeroDrift" in captured.out
     assert "healthy" in captured.out
+
+
+def test_cli_mid_review_demo_runs(capsys):
+    exit_code = main(["mid-review-demo"])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "Step 1/3" in captured.out
+    assert "Step 2/3" in captured.out
+    assert "Step 3/3" in captured.out
+    assert "Detection completed in" in captured.out
+    assert "sg-drift-demo" in captured.out
+
+
+def test_cli_mid_review_demo_shows_new_drift(capsys):
+    exit_code = main(["mid-review-demo"])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    # After the simulated drift, sg-drift-demo should appear as DRIFTED
+    # in the final rendered dashboard (it fronts the DB).
+    assert "sg-drift-demo" in captured.out
+    assert "DRIFTED" in captured.out

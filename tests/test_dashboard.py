@@ -74,6 +74,25 @@ def test_topology_panel_marks_drifted_node():
     assert panel is not None
 
 
+def test_topology_panel_marks_multiple_drifted_nodes():
+    graph = build_mock_graph()
+    graph.add_node("sg-2", resource_type="security_group")
+    drifts = [{"affected_node": "db-prod-01"}, {"affected_node": "sg-2"}]
+    drifted = _drifted_node_ids(drifts)
+    assert drifted == {"db-prod-01", "sg-2"}
+    panel = _build_topology_panel(graph=graph, drifts=drifts)
+    assert panel is not None
+
+
+def test_drift_list_panel_with_multiple_entries():
+    drifts = [
+        {"type": "public_db_exposure", "severity": "critical", "affected_node": "db-prod-01"},
+        {"type": "open_ingress", "severity": "high", "affected_node": "sg-2"},
+    ]
+    panel = _build_drift_list_panel(drifts)
+    assert panel is not None
+
+
 def test_drift_list_panel_empty():
     assert _build_drift_list_panel([]) is not None
 

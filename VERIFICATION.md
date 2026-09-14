@@ -1,4 +1,25 @@
-# Verification — Week 1 (complete) + Week 2 Day 1-3
+# Verification — Week 1 (complete) + Week 2 Day 1-4
+
+## Verified — Week 2 Day 4
+
+- `mid-review-demo` runs end-to-end without error: builds baseline,
+  adds a new drifted SG fronting the DB, detects it, prints elapsed
+  detection time, and renders the final dashboard with the new resource
+  shown as `DRIFTED` — confirmed visually.
+- Detection time printed is well under 5 seconds on the mock graph
+  (sub-millisecond in this environment).
+- Dashboard correctly renders 2+ simultaneous drifted resources without
+  layout issues — confirmed via new multi-drift tests.
+- `pytest -v` — **50/50 tests passed** (46 Day 3 tests retained + 4 new
+  mid-review-demo and multi-drift tests).
+
+## Not verified — Week 2 Day 4
+
+- The scripted demo scenario (new SG fronting the DB) is Person C's
+  construction for rehearsal purposes — it has not been run as an
+  actual joint demo with Person A and Person B, and timing/behavior
+  against their real (non-mock) graph is unverified.
+- `--watch` continuous loop remains unimplemented.
 
 ## Verified — Week 2 Day 3
 

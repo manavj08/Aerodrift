@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## Week 2, Day 4
+- Added `mid-review-demo` CLI command: scripted, timed walkthrough of
+  the Week 2 checkpoint flow (drift a mock SG → detect <5s → dashboard
+  shows red).
+- Verified dashboard correctness with multiple simultaneous drifted
+  resources (previously only tested with a single drift).
+- Added `tests/test_cli.py` coverage for `mid-review-demo`; added
+  multi-drift tests to `tests/test_dashboard.py`.
+
 ## Week 2, Day 3
 - `detect_drift()` placeholder is now real logic: NetworkX path-finding
   from `0.0.0.0/0` to sensitive resources (`database` nodes).
