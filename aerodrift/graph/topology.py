@@ -16,7 +16,11 @@ from datetime import datetime, timezone
 import networkx as nx
 
 INTERNET_NODE = "0.0.0.0/0"
-SENSITIVE_RESOURCE_TYPES = {"database"}
+# "rds" included alongside "database": Person B's sample_data.py / builder.py
+# label DB nodes with the real AWS-style type "rds". Without this, his own
+# sample data would produce zero drift detections. Confirm the real enum
+# with the team — this is a guess, not an agreed value.
+SENSITIVE_RESOURCE_TYPES = {"database", "rds"}
 
 
 def build_empty_graph() -> "nx.DiGraph":

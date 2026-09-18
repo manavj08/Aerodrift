@@ -12,9 +12,13 @@ codegen/sandbox, PDF reports. Currently at Week 1, Day 1.
 - argparse (CLI, stdlib)
 
 ## What works today
-- `aerodrift scan` / `status` / `remediate` / `report` — CLI stub commands
-- Static Rich dashboard layout shell
-- 7 passing tests
+- `aerodrift scan` / `status` — real graph + drift detection
+- Real (mock-graph) dashboard: topology table + drift-in-red highlighting
+- Real `detect_drift()` (NetworkX path-finding), verified <5s at scale
+- `mid-review-demo` — scripted Week 2 checkpoint walkthrough
+- **`remediate`** — real AST-based code generation for
+  `revoke_security_group_ingress` (not yet executed — sandbox is next)
+- 63 passing tests
 
 ## Not built yet
 - Real drift detection / graph rendering (Week 2)

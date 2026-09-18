@@ -93,8 +93,9 @@ def test_cli_remediate_with_args(capsys):
     exit_code = main(["remediate", "--sg-id", "sg-123", "--rule", "0.0.0.0/0:22"])
     captured = capsys.readouterr()
     assert exit_code == 0
+    assert "revoke_security_group_ingress" in captured.out
     assert "sg-123" in captured.out
-    assert "execute" in captured.out
+    assert "0.0.0.0/0:22" in captured.out
 
 
 def test_cli_remediate_dry_run(capsys):
@@ -104,6 +105,7 @@ def test_cli_remediate_dry_run(capsys):
     captured = capsys.readouterr()
     assert exit_code == 0
     assert "dry-run" in captured.out
+    assert "revoke_security_group_ingress" in captured.out
 
 
 def test_cli_report_default_output(capsys):

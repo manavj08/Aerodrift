@@ -55,6 +55,24 @@ call arguments.
 - [ ] Whether `offending_edge` can be `null` for non-edge drift types
 - [ ] Timestamp format/timezone convention
 - [ ] Error contract if a mock remediation method fails
+- [ ] **Ingestion -> graph shape was never actually agreed on.** Person A's
+      `get_mock_ec2_state()` returns `Resource`/`Relationship` dataclasses
+      (`aerodrift/ingestion/schema.py`); Person B's `build_graph()`
+      (`aerodrift/graph/builder.py`) expects dicts with a different,
+      non-overlapping key set. `aerodrift/ingestion/adapter.py` is a
+      **temporary** bridge with guessed defaults (`exposure`, `cidr`,
+      `port`, `protocol`, `direction` are not real data) — it is not a
+      substitute for A and B agreeing on one real shape. Delete it once
+      they do.
+- [ ] `SENSITIVE_RESOURCE_TYPES` in `topology.py` was widened to include
+      `"rds"` alongside `"database"` because Person B's `sample_data.py`
+      labels DB nodes `"rds"` (real-AWS-style typing) while the original
+      placeholder only recognized `"database"`. This was my inference to
+      keep the demo pipeline from silently showing zero drift — not a
+      confirmed team decision. Confirm the real resource-type enum.
+- [ ] `graph/contract.py`'s `NODE_FIELDS`/`EDGE_FIELDS` (Person B's own
+      draft schema) were never cross-checked against this file or against
+      Person A's ingestion schema — see the adapter note above.
 
 ## 5. Sample data (for Week 1 dashboard preview)
 

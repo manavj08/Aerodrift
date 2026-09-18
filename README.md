@@ -4,7 +4,43 @@ Agentic cloud topology & remediation engine. This repo covers **Person C's**
 individual assignment: CLI, Rich dashboard, AST-based code generator,
 sandboxed executor, and PDF incident reports.
 
-Status: **Week 2, Day 4 — mid-project review rehearsal.**
+Status: **Week 3, Day 1 — AST code generator built.**
+
+## What's here (Week 3 Day 1, additive to Week 2)
+
+- **Real `codegen.generate_remediation_code(drift)`** — builds an
+  `ast.Call` node (not string templating) for
+  `revoke_security_group_ingress(sg_id, rule)` and unparses it to source.
+  Built against **`CONTRACT.md`'s draft shape** — Person B has not
+  confirmed the real contract yet, so drift type names here
+  (`open_ingress`, `public_db_exposure`) and Person A's mock signature
+  are assumptions pending confirmation.
+- Unsupported drift types (e.g. `indirect_exposure`, which has no direct
+  rule to revoke) raise `UnsupportedDriftTypeError` rather than
+  generating something wrong.
+- Missing/malformed drift fields raise `MissingDriftFieldError` with a
+  clear message.
+- Values are inserted via `ast.Constant`, not string formatting — a
+  drift's `rule` string can't break out of the generated call (tested
+  with an injection-attempt payload).
+- **`remediate` CLI command wired to real codegen** — no longer a stub.
+  Prints the generated code; `--dry-run` explicitly does not execute it
+  (execution lands with the sandbox, Week 3 Day 2+).
+- Test suite expanded from 53 → 63 tests.
+
+## What's here (Week 2 Day 5, additive to Day 4)
+
+- **Dashboard hardened for real-world graph size and data quality**,
+  ahead of Person B's real (likely larger, differently-shaped) module:
+  - Topology table now caps at `MAX_TOPOLOGY_ROWS` (25) — drifted nodes
+    are always shown in full; healthy nodes beyond the cap are summarized
+    as "N more healthy resource(s)" instead of rendering an unbounded table.
+  - `_drifted_node_ids()` now tolerates malformed drift entries (missing/
+    `None` `affected_node`, non-dict entries) without crashing rendering.
+- Test suite expanded from 50 → 53 tests.
+- **Week 2 complete** — dashboard renders real topology, highlights
+  drift in red, `mid-review-demo` scripts the checkpoint flow, and
+  rendering is now defensive against data it hasn't seen yet.
 
 ## What's here (Week 2 Day 4, additive to Day 3)
 
@@ -155,29 +191,22 @@ pip install -r requirements.txt
 
 ```
 run.bat scan
-run.bat scan --demo-data
 run.bat status
-run.bat status --demo-data
-run.bat status --json
 run.bat demo
 run.bat mid-review-demo
+run.bat remediate --sg-id sg-0a1b2c3 --rule "0.0.0.0/0:22/tcp"
+run.bat remediate --sg-id sg-123 --rule "0.0.0.0/0:80/tcp" --dry-run
 ```
 
 Or manually:
 ```
 venv\Scripts\activate
-python -m aerodrift.cli.main scan --demo-data
-python -m aerodrift.cli.main status --demo-data
-python -m aerodrift.cli.main mid-review-demo
+python -m aerodrift.cli.main remediate --sg-id sg-0a1b2c3 --rule "0.0.0.0/0:22/tcp"
 ```
 
-**For the Week 2 mid-project review**, run `mid-review-demo` — it walks
-through the full "drift a mock SG → detect → show red" flow in one
-command and prints the detection time.
-
-**Note:** `scan`/`status` show real detected drift by default (the mock
-graph's internet→DB edge). Use `--demo-data` if you want the fixed
-`SAMPLE_DRIFTS` set instead — e.g. for consistent screenshots.
+`remediate` now generates real AST-based code for
+`revoke_security_group_ingress` — it does not execute it yet (that's the
+sandbox, coming next in Week 3).
 
 ## Test
 
@@ -191,7 +220,7 @@ venv\Scripts\activate
 pytest -v
 ```
 
-Expected: **50 passed**.
+Expected: **63 passed**.
 
 ## Folder structure
 
@@ -298,11 +327,37 @@ shape; changes after this point need team agreement.
 - [x] Dashboard verified correct with multiple simultaneous drifts
 - [x] Test suite (50 tests passing)
 
-## Remaining (Week 2)
+## Completed (Week 2, Day 5 — Week 2 done)
 
-- [ ] Replace `aerodrift/graph/topology.py` placeholder with Person B's
-      real module once delivered — public function signatures match, so
-      the swap should not require dashboard/CLI changes
-- [ ] Implement `--watch` continuous re-scan loop
-- [ ] **Mid-project review**: run `mid-review-demo` live; confirm timing
-      and rendering hold up against Person B's real graph once available
+- [x] Topology table capped at 25 rows with truncation summary (drifted
+      nodes always shown in full)
+- [x] Drift-object parsing hardened against malformed entries
+- [x] Test suite (53 tests passing)
+
+## Week 2 summary
+
+- Dashboard renders real (mock) topology with drift highlighted in red
+- `detect_drift()` placeholder performs genuine NetworkX path-finding
+- `mid-review-demo` provides a one-command checkpoint rehearsal
+- Rendering is defensive against larger/messier real data
+
+## Completed (Week 3, Day 1)
+
+- [x] Real `ast`-based `generate_remediation_code()` — builds and
+      unparses `revoke_security_group_ingress(sg_id, rule)` calls
+- [x] Unsupported/missing-field error handling with clear exceptions
+- [x] Injection-safety confirmed (values via `ast.Constant`)
+- [x] `remediate` CLI wired to real codegen
+- [x] Test suite (63 tests passing)
+
+## Remaining before Week 3 continues
+
+- [ ] **Confirm real contract with Person B** — `open_ingress` /
+      `public_db_exposure` type names and the mock signature are drawn
+      from `CONTRACT.md`'s draft, not yet confirmed
+- [ ] Build the sandboxed `exec()` executor (`sandbox.py`) — next step,
+      to actually run the generated code against Person A's mock methods
+- [ ] Extend codegen once Person A adds more mock remediation methods
+      (currently only `revoke_security_group_ingress` exists)
+- [ ] Handle `indirect_exposure` drift type once its remediation
+      mapping is defined by the team

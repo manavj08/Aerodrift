@@ -1,4 +1,54 @@
-# Verification — Week 1 (complete) + Week 2 Day 1-4
+# Verification — Week 1 (complete) + Week 2 (complete) + Week 3 Day 1
+
+## Verified — Week 3 Day 1
+
+- `generate_remediation_code()` produces syntactically valid, executable
+  Python for both `open_ingress` and `public_db_exposure` drift types —
+  confirmed by parsing the output with `ast.parse()` and by actually
+  `exec()`-ing it against a mock function and checking the call args.
+- Unsupported drift type (`indirect_exposure`) correctly raises
+  `UnsupportedDriftTypeError` instead of generating incorrect code.
+- Missing `type`, `affected_node`, `offending_edge`, or
+  `offending_edge.rule` each correctly raise `MissingDriftFieldError`.
+- Injection-safety: a `rule` value containing a quote-and-statement
+  injection attempt still parses as a single safe call expression, not
+  multiple statements — confirmed via `ast.parse()` producing exactly
+  one `ast.Expr` in `tree.body`.
+- `aerodrift remediate --sg-id ... --rule ...` visually confirmed to
+  print the generated code correctly, with `--dry-run` clearly labeled
+  as not executing.
+- `pytest -v` — **63/63 tests passed** (53 Week 2 tests retained/updated
+  + 11 new codegen tests, replacing the old `NotImplementedError` stub test).
+
+## Not verified — Week 3 Day 1
+
+- **Drift type names and the mock remediation signature are unconfirmed
+  by Person B/A** — built entirely against `CONTRACT.md`'s draft. If the
+  real contract uses different type strings or a different function
+  signature, this file needs rework.
+- No sandbox exists yet — generated code is never actually executed by
+  the CLI, only printed. Execution safety (restricted builtins, no
+  filesystem/network) is Day 2+ work.
+- Only one remediation function is supported; behavior once Person A
+  adds more mock methods (e.g. `detach_public_ip`) is unverified.
+
+## Verified — Week 2 Day 5
+
+- Topology table caps healthy-row display at 25 while always showing
+  every drifted node — confirmed via a synthetic oversized graph test.
+- `_drifted_node_ids()` confirmed to skip malformed entries (missing
+  `affected_node`, `None`, non-dict list items) without raising.
+- Full dashboard render re-checked visually after changes — drifted rows
+  still appear correctly, ordering unaffected for small graphs.
+- `pytest -v` — **53/53 tests passed** (50 Day 4 tests retained + 3 new
+  defensive-rendering tests).
+
+## Not verified — Week 2 Day 5
+
+- Truncation behavior against Person B's real graph shape/scale — only
+  tested with synthetic oversized mock graphs, not real AWS-scale data.
+- `--watch` continuous loop remains unimplemented (deferred, does not
+  block Week 3).
 
 ## Verified — Week 2 Day 4
 

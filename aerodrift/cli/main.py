@@ -16,6 +16,11 @@ import time
 from aerodrift import __version__
 from aerodrift.cli.dashboard import render_shell
 from aerodrift.graph.topology import build_mock_graph, detect_drift, INTERNET_NODE
+from aerodrift.remediation.codegen import (
+    generate_remediation_code,
+    UnsupportedDriftTypeError,
+    MissingDriftFieldError,
+)
 
 SAMPLE_DRIFTS = [
     {
@@ -136,11 +141,21 @@ def main(argv=None) -> int:
         if not args.sg_id or not args.rule:
             print("error: --sg-id and --rule are required", file=sys.stderr)
             return 2
-        action = "dry-run" if args.dry_run else "execute"
-        print(
-            f"[stub] remediate ({action}): sg={args.sg_id} rule={args.rule} "
-            "— code generation not implemented yet (Week 3)."
-        )
+        drift = {
+            "type": "open_ingress",
+            "affected_node": args.sg_id,
+            "offending_edge": {"source": INTERNET_NODE, "target": args.sg_id, "rule": args.rule},
+        }
+        try:
+            code = generate_remediation_code(drift)
+        except (UnsupportedDriftTypeError, MissingDriftFieldError) as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        print(f"Generated remediation code:\n  {code}")
+        if args.dry_run:
+            print("(dry-run: not executed — sandbox execution lands Week 3 Day 2+)")
+        else:
+            print("(sandbox execution not implemented yet — this will run in Week 3)")
     elif args.command == "report":
         print(f"[stub] report: would write to {args.output} — not implemented yet (Week 4).")
     elif args.command == "demo":

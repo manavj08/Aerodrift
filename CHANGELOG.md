@@ -1,5 +1,48 @@
 # CHANGELOG
 
+## Merge — Person A (Ashutosh) + Person B (Prasanth) + Person C combined
+- **Person A (ingestion):** added real `aerodrift/ingestion/mock_client.py`
+  (`get_mock_ec2_state()`, moto-backed EC2/SecurityGroup mock) and
+  `aerodrift/ingestion/schema.py` (`Resource`, `Relationship` dataclasses),
+  replacing the placeholder `mock_aws.py`. 2 tests added.
+- **Person B (graph):** added real `aerodrift/graph/builder.py`
+  (`build_graph(resources, connections)`) and `aerodrift/graph/contract.py`
+  (field-name reference). `topology.py`'s `detect_drift()` is still
+  Person C's placeholder — Person B has not yet delivered real drift
+  detection, only graph construction. 4 tests added.
+- **Integration gap found and bridged, not silently resolved:** Person
+  A's dataclass output and Person B's dict-based `build_graph()` input use
+  incompatible, never-agreed-upon shapes. Added
+  `aerodrift/ingestion/adapter.py` as an explicit, documented **temporary**
+  bridge (see `CONTRACT.md` open items) — not a substitute for the team
+  agreeing on one real ingestion/graph contract. 3 new tests cover it,
+  including a live end-to-end run (ingestion → adapter → graph →
+  `detect_drift`) confirming the pipeline executes without error.
+- Fixed a latent bug: Person B's `sample_data.py` labels DB nodes `"rds"`,
+  but `detect_drift()`'s `SENSITIVE_RESOURCE_TYPES` only recognized
+  `"database"` — his own sample data would have shown zero drift.
+  Widened the set; flagged in `CONTRACT.md` as unconfirmed.
+- Test suite: 63 (Person C, Week 3 Day 1) + 2 (A) + 4 (B) + 3 (adapter)
+  = **72 passing**.
+
+## Week 3, Day 1
+- Implemented real `codegen.generate_remediation_code()` using Python's
+  `ast` module — builds and unparses
+  `revoke_security_group_ingress(sg_id, rule)` calls.
+- Added `UnsupportedDriftTypeError` and `MissingDriftFieldError` for
+  clear failure modes.
+- Wired `remediate` CLI command to real codegen (was a stub).
+- Replaced the old placeholder `test_codegen.py` with 11 real tests,
+  including an injection-safety test.
+- **Note:** built against `CONTRACT.md`'s draft shape — pending
+  confirmation from Person B.
+
+## Week 2, Day 5 (Week 2 complete)
+- Topology table capped at `MAX_TOPOLOGY_ROWS` (25); drifted nodes always
+  shown in full, healthy nodes beyond the cap summarized.
+- `_drifted_node_ids()` hardened against malformed drift entries.
+- Added 3 defensive-rendering tests.
+
 ## Week 2, Day 4
 - Added `mid-review-demo` CLI command: scripted, timed walkthrough of
   the Week 2 checkpoint flow (drift a mock SG → detect <5s → dashboard
