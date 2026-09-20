@@ -4,7 +4,39 @@ Agentic cloud topology & remediation engine. This repo covers **Person C's**
 individual assignment: CLI, Rich dashboard, AST-based code generator,
 sandboxed executor, and PDF incident reports.
 
-Status: **Week 3, Day 1 — AST code generator built.**
+Status: **Week 3, Day 1 (team merge + integration fix) — 76 tests passing.**
+
+## What's here (team merge + adapter fix, additive to Week 3 Day 1 solo)
+
+Person A (Ashutosh) and Person B (Prasanth) delivered real ingestion and
+graph-construction code. This section documents the merge and a bug fix
+found by actually running the combined pipeline, not just the individual
+pieces' own tests.
+
+- **Person A's real ingestion** (`aerodrift/ingestion/mock_client.py`,
+  `schema.py`): moto-backed mock EC2 state, `Resource`/`Relationship`
+  dataclasses. Replaces the old `mock_aws.py` placeholder.
+- **Person B's real graph builder** (`aerodrift/graph/builder.py`):
+  `build_graph(resources, connections)`. `detect_drift()` in
+  `topology.py` is still Person C's placeholder logic — B has not yet
+  delivered real drift detection.
+- **`aerodrift/ingestion/adapter.py`** — a documented, explicitly
+  **temporary** bridge between A's dataclass output and B's dict-based
+  `build_graph()` input, since their shapes were never actually agreed
+  on (see `CONTRACT.md`).
+- **Bug found and fixed**: running the real pipeline by hand (ingestion →
+  adapter → graph → `detect_drift()`) showed it silently found **zero
+  drift**, despite Person A's mock security group having a genuinely
+  open `0.0.0.0/0:22` rule. The adapter now synthesizes the missing
+  internet node/edge from that rule — clearly marked as a workaround,
+  not a real ingestion feature.
+- **Still open (not fixed, deliberately)**: `detect_drift()` still finds
+  zero drift on the real pipeline even after the fix above, because
+  `SENSITIVE_RESOURCE_TYPES` doesn't cover security groups and there's a
+  casing mismatch (`"security_group"` vs `"SecurityGroup"`). This is a
+  team policy decision, not something to guess at — see `CONTRACT.md`.
+- Test suite: 72 (initial merge) → **76 passing** (4 new adapter tests,
+  1 stale test fixed).
 
 ## What's here (Week 3 Day 1, additive to Week 2)
 

@@ -64,6 +64,32 @@ call arguments.
       `port`, `protocol`, `direction` are not real data) — it is not a
       substitute for A and B agreeing on one real shape. Delete it once
       they do.
+- [x] ~~`detect_drift()` found zero drift on real A+B pipeline output~~ —
+      **FIXED**: `adapter.py` now synthesizes an internet node
+      (`INTERNET_NODE = "0.0.0.0/0"`) and an inbound edge whenever a
+      resource's `attributes["ingress"]` string shows a public
+      (`0.0.0.0/0:PORT`) rule, since nothing in the real pipeline created
+      that node before. See `adapter.py`'s `_synthesize_internet_exposure()`
+      docstring — this is a workaround for one specific string format
+      Person A's mock client happens to produce today, not a general
+      ingestion feature. Covered by `tests/test_adapter.py`.
+- [ ] **STILL OPEN, not fixed by the above**: even with the internet node
+      now present, `detect_drift()` reports **zero drift** on the real A+B
+      pipeline (`tests/test_adapter.py::test_detect_drift_still_finds_nothing_on_real_data_pending_type_alignment`
+      documents this). Two compounding causes:
+      1. `SENSITIVE_RESOURCE_TYPES` in `topology.py` is `{"database", "rds"}`
+         — an internet-facing `SecurityGroup`/`EC2Instance` alone is never
+         flagged. Team needs to decide: should a directly-exposed SG/EC2
+         count as drift on its own, or only when it fronts something in
+         `SENSITIVE_RESOURCE_TYPES`?
+      2. Casing mismatch: `topology.py`'s own mock graph uses lowercase
+         `"security_group"`; Person A's real mock data uses PascalCase
+         `"SecurityGroup"`. If SGs are added to `SENSITIVE_RESOURCE_TYPES`,
+         the exact casing needs to be confirmed and made consistent, or
+         `detect_drift()` needs to normalize case.
+      I deliberately did NOT guess at either of these — they're policy
+      decisions (what counts as drift, what casing is authoritative), not
+      shape-bridging like the internet-node fix above.
 - [ ] `SENSITIVE_RESOURCE_TYPES` in `topology.py` was widened to include
       `"rds"` alongside `"database"` because Person B's `sample_data.py`
       labels DB nodes `"rds"` (real-AWS-style typing) while the original

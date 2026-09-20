@@ -1,4 +1,39 @@
-# Verification — Week 1 (complete) + Week 2 (complete) + Week 3 Day 1
+# Verification — Week 1 (complete) + Week 2 (complete) + Week 3 Day 1 + team merge/fix
+
+## Verified — team merge + adapter fix
+
+- Ran the merged team submission's own test suite (72 tests) directly —
+  confirmed genuinely passing, not just claimed in its docs.
+- Independently ran the real pipeline by hand (`get_mock_ec2_state()` →
+  `resources_to_graph_input()` → `build_graph()` → `detect_drift()`) and
+  observed it return `[]` despite the mock data having an open
+  `0.0.0.0/0:22` SG rule — this is what surfaced the bug.
+- After the fix: confirmed the adapter now produces an
+  `INTERNET_NODE` (`"0.0.0.0/0"`) resource dict and a matching inbound
+  connection dict whenever a resource's `ingress` attribute shows a
+  public CIDR.
+- Confirmed via `nx.has_path()` that the built graph now has a real path
+  from the internet node to the security group.
+- Confirmed (and deliberately did NOT hide) that `detect_drift()` still
+  returns `[]` on this pipeline, due to the separate
+  `SENSITIVE_RESOURCE_TYPES`/casing gap — captured as an explicit,
+  clearly-labeled test rather than a silently-passing one.
+- `pytest -v` — **76/76 tests passed** (72 merge tests retained + 4 new
+  adapter tests; 1 pre-existing test corrected for the new node/edge count).
+
+## Not verified — team merge + adapter fix
+
+- The `"{cidr}:{port}"` ingress string format the fix parses is specific
+  to Person A's current `mock_client.py` — if A's real (non-mock)
+  ingestion produces ingress data in a different shape, this workaround
+  will not recognize it and needs revisiting.
+- Whether an internet-facing `SecurityGroup` should itself count as
+  drift (vs. only flagging when it fronts a sensitive resource) is an
+  unresolved team/product decision — not something this fix attempts to
+  answer.
+- Person B's real `detect_drift()` implementation does not exist yet;
+  all of the above is verified only against Person C's placeholder
+  detection logic.
 
 ## Verified — Week 3 Day 1
 

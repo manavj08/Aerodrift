@@ -18,9 +18,75 @@ filled with best-effort defaults pulled from `Resource.attributes` /
 `Relationship.attributes` where present, else a sentinel value — they are
 NOT guaranteed accurate and should not be trusted for anything beyond
 keeping the demo pipeline running.
+
+SECOND WORKAROUND (added after the first pipeline landed): running the
+adapter's output through `detect_drift()` found ZERO drift even though
+Person A's mock security group has a genuinely open `0.0.0.0/0:22`
+ingress rule. Cause: `detect_drift()` only searches from a literal graph
+node named "0.0.0.0/0" (topology.INTERNET_NODE), and nothing in this
+pipeline ever created that node — the open-ingress fact was sitting
+unused in `Resource.attributes["ingress"]` as a string. `_synthesize_internet_exposure()`
+below parses that string and adds the missing internet node/edge so the
+known-drifted mock resource is actually detected. This is a workaround,
+not a real ingestion feature: it only recognizes the exact
+"{cidr}:{port}" string format Person A's mock_client.py currently
+produces, and does nothing for any other ingress representation. Delete
+this once Person A/B agree on a real way to represent public exposure
+in the graph.
 """
 
+from aerodrift.graph.topology import INTERNET_NODE
 from aerodrift.ingestion.schema import Resource, Relationship
+
+PUBLIC_CIDR = "0.0.0.0/0"
+
+
+def _synthesize_internet_exposure(
+    resources: list[Resource], resource_dicts: list[dict]
+) -> tuple[list[dict], list[dict]]:
+    """Detect resources whose `ingress` attribute shows a public
+    (0.0.0.0/0) rule, and synthesize the internet node + an edge to them
+    so `detect_drift()` can actually find this exposure.
+
+    Only understands the "{cidr}:{port}" ingress string format produced
+    by `mock_client.get_mock_ec2_state()` today. Anything else is left
+    alone (not an error — just not recognized as public exposure yet).
+    """
+    extra_resource_dicts = []
+    extra_connection_dicts = []
+    internet_node_needed = False
+
+    for resource in resources:
+        ingress = resource.attributes.get("ingress")
+        if not ingress or ":" not in ingress:
+            continue
+        cidr, _, port = ingress.partition(":")
+        if cidr != PUBLIC_CIDR:
+            continue
+
+        internet_node_needed = True
+        extra_connection_dicts.append(
+            {
+                "source": INTERNET_NODE,
+                "target": resource.resource_id,
+                "port": port or 0,
+                "protocol": "tcp",
+                "direction": "inbound",
+            }
+        )
+
+    if internet_node_needed:
+        extra_resource_dicts.append(
+            {
+                "id": INTERNET_NODE,
+                "type": "internet",
+                "name": "Internet",
+                "exposure": "public",
+                "cidr": PUBLIC_CIDR,
+            }
+        )
+
+    return resource_dicts + extra_resource_dicts, extra_connection_dicts
 
 
 def resources_to_graph_input(
@@ -50,5 +116,10 @@ def resources_to_graph_input(
         }
         for rel in relationships
     ]
+
+    resource_dicts, internet_connection_dicts = _synthesize_internet_exposure(
+        resources, resource_dicts
+    )
+    connection_dicts = connection_dicts + internet_connection_dicts
 
     return resource_dicts, connection_dicts

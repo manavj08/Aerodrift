@@ -25,6 +25,38 @@
 - Test suite: 63 (Person C, Week 3 Day 1) + 2 (A) + 4 (B) + 3 (adapter)
   = **72 passing**.
 
+## Adapter fix — real pipeline now actually detects drift (partially)
+- **Bug found**: running the real ingestion → adapter → graph → 
+  `detect_drift()` pipeline by hand (not just the existing "does it run"
+  tests) showed it silently found **zero drift**, despite Person A's mock
+  data having a genuinely open `0.0.0.0/0:22` security group rule.
+  Root cause: `detect_drift()` requires a literal graph node named
+  `"0.0.0.0/0"` to search from, and nothing in the real pipeline ever
+  created it — the open-ingress fact sat unused in
+  `Resource.attributes["ingress"]`.
+- **Fix**: `adapter.py` gained `_synthesize_internet_exposure()`, which
+  parses each resource's `ingress` attribute (format:
+  `"{cidr}:{port}"`) and, when the CIDR is `0.0.0.0/0`, adds the missing
+  internet node and an inbound edge to that resource. Clearly marked as
+  a workaround for one specific string format Person A's mock client
+  produces today — not a general ingestion feature.
+- **Still open, not fixed**: even with the internet node present,
+  `detect_drift()` now correctly finds a path from the internet to the
+  security group, but still reports **zero drift**, because
+  `SENSITIVE_RESOURCE_TYPES` (`{"database", "rds"}`) doesn't cover
+  `SecurityGroup`/`EC2Instance`, and there's a separate casing mismatch
+  (`topology.py`'s own mock graph uses `"security_group"`, Person A's
+  real data uses `"SecurityGroup"`). Deliberately NOT guessed at — see
+  `CONTRACT.md` open items; this needs a team decision on what counts as
+  drift and which casing is authoritative.
+- Added 4 new tests to `tests/test_adapter.py`: 2 proving the internet
+  node/edge are now synthesized correctly, 1 proving the full pipeline
+  now has real internet→SG reachability, and 1 that deliberately
+  documents (rather than hides) the remaining zero-drift gap. Fixed 1
+  stale test whose hardcoded node/edge counts didn't account for the
+  new synthesized node.
+- Test suite: 72 → **76 passing**.
+
 ## Week 3, Day 1
 - Implemented real `codegen.generate_remediation_code()` using Python's
   `ast` module — builds and unparses
