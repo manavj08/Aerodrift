@@ -89,16 +89,18 @@ def test_cli_remediate_requires_sg_and_rule(capsys):
     assert "required" in captured.err
 
 
-def test_cli_remediate_with_args(capsys):
+def test_cli_remediate_with_args_executes_in_sandbox(capsys):
     exit_code = main(["remediate", "--sg-id", "sg-123", "--rule", "0.0.0.0/0:22"])
     captured = capsys.readouterr()
     assert exit_code == 0
     assert "revoke_security_group_ingress" in captured.out
     assert "sg-123" in captured.out
     assert "0.0.0.0/0:22" in captured.out
+    assert "Executed in sandbox" in captured.out
+    assert "success" in captured.out
 
 
-def test_cli_remediate_dry_run(capsys):
+def test_cli_remediate_dry_run_does_not_execute(capsys):
     exit_code = main(
         ["remediate", "--sg-id", "sg-123", "--rule", "0.0.0.0/0:22", "--dry-run"]
     )
@@ -106,6 +108,7 @@ def test_cli_remediate_dry_run(capsys):
     assert exit_code == 0
     assert "dry-run" in captured.out
     assert "revoke_security_group_ingress" in captured.out
+    assert "Executed in sandbox" not in captured.out
 
 
 def test_cli_report_default_output(capsys):

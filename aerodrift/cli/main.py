@@ -21,6 +21,8 @@ from aerodrift.remediation.codegen import (
     UnsupportedDriftTypeError,
     MissingDriftFieldError,
 )
+from aerodrift.remediation.mock_methods import revoke_security_group_ingress
+from aerodrift.remediation.sandbox import run_sandboxed, SandboxExecutionError
 
 SAMPLE_DRIFTS = [
     {
@@ -153,9 +155,21 @@ def main(argv=None) -> int:
             return 1
         print(f"Generated remediation code:\n  {code}")
         if args.dry_run:
-            print("(dry-run: not executed — sandbox execution lands Week 3 Day 2+)")
+            print("(dry-run: not executed)")
         else:
-            print("(sandbox execution not implemented yet — this will run in Week 3)")
+            allowed = {"revoke_security_group_ingress": revoke_security_group_ingress}
+            try:
+                result = run_sandboxed(code, allowed)
+            except SandboxExecutionError as exc:
+                print(f"error: sandbox execution failed: {exc}", file=sys.stderr)
+                return 1
+            status = result.get("status", "unknown")
+            message = result.get("message", "")
+            print(f"Executed in sandbox — status: {status}")
+            if message:
+                print(f"  {message}")
+            if status != "success":
+                return 1
     elif args.command == "report":
         print(f"[stub] report: would write to {args.output} — not implemented yet (Week 4).")
     elif args.command == "demo":

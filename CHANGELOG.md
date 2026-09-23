@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## Week 3, Day 2
+- Implemented real `sandbox.run_sandboxed()`: restricted `exec()`,
+  minimal safe-builtins allowlist, only executes single-call statements
+  against a caller-supplied `allowed_globals` set.
+- Added `aerodrift/remediation/mock_methods.py` — placeholder mock
+  remediation method, since Person A has not yet delivered real mock
+  remediation methods (only ingestion so far). See `CONTRACT.md` section 2.
+- Wired `remediate` CLI to actually execute generated code (previously
+  only printed it); `--dry-run` now meaningfully skips execution.
+- Added 13 sandbox tests (correctness + security: blocked imports, eval,
+  disallowed calls, multi-statement injection, invalid syntax) and 4
+  `mock_methods.py` placeholder tests.
+- Updated 2 `test_cli.py` remediate tests to assert on real sandbox
+  execution output instead of the old stub message.
+- Test suite: 76 → **92 passing**.
+
 ## Merge — Person A (Ashutosh) + Person B (Prasanth) + Person C combined
 - **Person A (ingestion):** added real `aerodrift/ingestion/mock_client.py`
   (`get_mock_ec2_state()`, moto-backed EC2/SecurityGroup mock) and

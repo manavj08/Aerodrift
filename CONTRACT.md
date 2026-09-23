@@ -42,6 +42,15 @@ def revoke_security_group_ingress(sg_id: str, rule: str) -> dict:
 # are supported (e.g. detach_public_ip, restrict_s3_bucket_policy).
 ```
 
+**Status as of Week 3 Day 2**: Person A has delivered real ingestion
+(`aerodrift/ingestion/`) but has **not yet delivered real mock
+remediation methods**. `aerodrift/remediation/mock_methods.py` is Person
+C's placeholder implementing the signature above, built so
+`sandbox.py` has something real to execute and test against. Swap it
+for Person A's real module once delivered — `sandbox.run_sandboxed()`'s
+`allowed_globals` parameter is the seam; no other code should need to
+change if the signature matches.
+
 ## 3. What Person C's codegen consumes
 
 Given a drift object, `codegen.generate_remediation_code(drift)` maps

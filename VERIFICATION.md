@@ -1,4 +1,39 @@
-# Verification — Week 1 (complete) + Week 2 (complete) + Week 3 Day 1 + team merge/fix
+# Verification — Week 1 (complete) + Week 2 (complete) + Week 3 Day 1-2 + team merge/fix
+
+## Verified — Week 3 Day 2 (sandbox)
+
+- `run_sandboxed()` correctly executes `codegen.py`'s generated output
+  against `mock_methods.revoke_security_group_ingress()` and returns its
+  real result — confirmed both via unit test and by asserting on the
+  mock's in-memory call log (proves the function was actually invoked,
+  not just that no exception was raised).
+- Confirmed the sandbox rejects, with `SandboxExecutionError`: calls to
+  functions not in `allowed_globals` (including `open`, `eval`,
+  `__import__`), multiple statements, non-call expressions, and invalid
+  syntax.
+- Directly inspected `_SAFE_BUILTINS` and confirmed `open`, `eval`,
+  `exec`, `compile`, `getattr`, `setattr`, `__import__`, and
+  `__build_class__` are all absent.
+- `aerodrift remediate --sg-id ... --rule ...` (no `--dry-run`) visually
+  confirmed to generate code, execute it, and print the mock function's
+  real success message; `--dry-run` confirmed to stop before execution.
+- `pytest -v` — **92/92 tests passed** (76 merge/fix tests retained + 13
+  new sandbox tests + 4 new mock_methods placeholder tests, minus the
+  old `remediate` stub-output test replaced with two real-execution tests).
+
+## Not verified — Week 3 Day 2
+
+- **Person A's real mock remediation methods do not exist yet.** The
+  sandbox has only ever executed against Person C's own
+  `mock_methods.py` placeholder — signature compatibility with A's real
+  module is unverified until delivered.
+- The sandbox's security model is explicitly documented as
+  defense-in-depth, not a claim of a fully secure CPython sandbox (see
+  `sandbox.py`'s module docstring) — it has not been red-teamed beyond
+  the specific bypass attempts covered in the test suite (import, eval,
+  disallowed calls, multi-statement injection).
+- Only one remediation function is supported end-to-end; behavior with
+  additional mock methods (once Person A adds them) is unverified.
 
 ## Verified — team merge + adapter fix
 

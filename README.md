@@ -4,7 +4,35 @@ Agentic cloud topology & remediation engine. This repo covers **Person C's**
 individual assignment: CLI, Rich dashboard, AST-based code generator,
 sandboxed executor, and PDF incident reports.
 
-Status: **Week 3, Day 1 (team merge + integration fix) — 76 tests passing.**
+Status: **Week 3, Day 2 — sandboxed executor built, 92 tests passing.**
+
+## What's here (Week 3 Day 2, additive to Day 1 + merge)
+
+- **Real `sandbox.run_sandboxed(code, allowed_globals)`** — restricted
+  `exec()` with a minimal safe-builtins allowlist (`len`, `str`, `int`,
+  `float`, `bool`, `dict`, `list`, `tuple`, `print` — no `open`,
+  `__import__`, `eval`, `exec`, `compile`, `getattr`/`setattr`). Only
+  accepts a single function-call statement, and only executes it if the
+  called name is in the caller-supplied `allowed_globals` — anything
+  else raises `SandboxExecutionError` before touching `exec()` at all.
+- **`aerodrift/remediation/mock_methods.py`** — placeholder mock
+  remediation method (`revoke_security_group_ingress`), since **Person A
+  has not yet delivered real mock remediation methods** (only ingestion
+  so far — see `CONTRACT.md` section 2, still open). Logs calls
+  in-memory so tests/CLI output can prove the sandbox actually invoked
+  it, not just that it didn't crash.
+- **`remediate` CLI command now actually executes** (unless
+  `--dry-run`) — full loop: `generate_remediation_code()` →
+  `run_sandboxed()` → prints the mock function's real result.
+- Security tests prove the sandbox blocks: calling disallowed functions,
+  multiple statements, non-call expressions, invalid syntax,
+  `__import__`, `eval`, and confirm `open`/`eval`/`exec`/`compile`/
+  `getattr`/`setattr` are absent from the sandbox's builtins.
+- Documented, in the sandbox module's own docstring, that this is
+  defense-in-depth against a buggy generator — not a claim of a fully
+  secure CPython sandbox, since the code it runs comes from `codegen.py`'s
+  fixed templates, not arbitrary user input.
+- Test suite expanded from 76 → 92 tests.
 
 ## What's here (team merge + adapter fix, additive to Week 3 Day 1 solo)
 
@@ -236,9 +264,9 @@ venv\Scripts\activate
 python -m aerodrift.cli.main remediate --sg-id sg-0a1b2c3 --rule "0.0.0.0/0:22/tcp"
 ```
 
-`remediate` now generates real AST-based code for
-`revoke_security_group_ingress` — it does not execute it yet (that's the
-sandbox, coming next in Week 3).
+`remediate` now generates real AST-based code and **executes it** in the
+sandbox against the mock remediation method (unless `--dry-run` is
+passed, in which case it only prints the generated code).
 
 ## Test
 
@@ -252,7 +280,7 @@ venv\Scripts\activate
 pytest -v
 ```
 
-Expected: **63 passed**.
+Expected: **92 passed**.
 
 ## Folder structure
 
@@ -382,14 +410,37 @@ shape; changes after this point need team agreement.
 - [x] `remediate` CLI wired to real codegen
 - [x] Test suite (63 tests passing)
 
-## Remaining before Week 3 continues
+## Remaining after Week 3 Day 1
 
+- [x] ~~Build the sandboxed `exec()` executor~~ — **done Day 2**, see below
 - [ ] **Confirm real contract with Person B** — `open_ingress` /
       `public_db_exposure` type names and the mock signature are drawn
       from `CONTRACT.md`'s draft, not yet confirmed
-- [ ] Build the sandboxed `exec()` executor (`sandbox.py`) — next step,
-      to actually run the generated code against Person A's mock methods
-- [ ] Extend codegen once Person A adds more mock remediation methods
-      (currently only `revoke_security_group_ingress` exists)
+- [ ] Extend codegen once Person A delivers real mock remediation methods
+      (currently only Person C's `mock_methods.py` placeholder exists)
+- [ ] Handle `indirect_exposure` drift type once its remediation
+      mapping is defined by the team
+
+## Completed (Week 3, Day 2)
+
+- [x] Real `sandbox.run_sandboxed()` — restricted `exec()`, allowlisted
+      functions only, minimal safe builtins
+- [x] `aerodrift/remediation/mock_methods.py` placeholder (Person A's
+      real mock remediation methods not yet delivered)
+- [x] `remediate` CLI now actually executes (full generate → sandbox loop)
+- [x] Security tests: blocked filesystem access, imports, eval, disallowed
+      calls, multiple statements, invalid syntax
+- [x] Test suite (92 tests passing)
+
+## Remaining before Week 3 continues
+
+- [ ] **Person A still owes real mock remediation methods** (per
+      `CONTRACT.md` section 2) — swap `mock_methods.py` for A's real
+      module once delivered; `sandbox.py`'s `allowed_globals` parameter
+      is the seam
+- [ ] **Confirm real contract with Person B** — drift type names still
+      unconfirmed (see Day 1 note above)
+- [ ] Extend codegen/sandbox once more mock remediation methods exist
+      beyond `revoke_security_group_ingress`
 - [ ] Handle `indirect_exposure` drift type once its remediation
       mapping is defined by the team
