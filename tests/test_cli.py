@@ -178,3 +178,43 @@ def test_cli_mid_review_demo_shows_new_drift(capsys):
     # in the final rendered dashboard (it fronts the DB).
     assert "sg-drift-demo" in captured.out
     assert "DRIFTED" in captured.out
+
+
+def test_cli_self_heal_demo_runs(capsys):
+    exit_code = main(["self-heal-demo"])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "Step 1/4" in captured.out
+    assert "Step 2/4" in captured.out
+    assert "Step 3/4" in captured.out
+    assert "Step 4/4" in captured.out
+    assert "Detection completed in" in captured.out
+
+
+def test_cli_self_heal_demo_generates_and_executes_remediation(capsys):
+    exit_code = main(["self-heal-demo"])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "revoke_security_group_ingress" in captured.out
+    assert "sandbox result: success" in captured.out
+    assert "db-prod-01" in captured.out
+
+
+def test_cli_self_heal_demo_flags_sg_id_mismatch_honestly(capsys):
+    # The demo must not silently pretend the DB node is a real SG — it
+    # should state the mismatch explicitly.
+    exit_code = main(["self-heal-demo"])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "not necessarily an actual security group" in captured.out
+
+
+def test_cli_self_heal_demo_calls_mock_remediation_for_real(capsys):
+    from aerodrift.remediation.mock_methods import get_revoked_log, clear_revoked_log
+
+    clear_revoked_log()
+    main(["self-heal-demo"])
+    log = get_revoked_log()
+    assert len(log) == 1
+    assert log[0]["sg_id"] == "db-prod-01"
+    clear_revoked_log()

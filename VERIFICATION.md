@@ -1,4 +1,29 @@
-# Verification — Week 1 (complete) + Week 2 (complete) + Week 3 Day 1-2 + team merge/fix
+# Verification — Week 1 (complete) + Week 2 (complete) + Week 3 close-out + team merge/fix
+
+## Verified — Week 3 close-out (self-heal-demo)
+
+- `self-heal-demo` runs end-to-end: builds topology, detects drift,
+  times detection, generates remediation code for each drift, executes
+  it in the sandbox, and re-renders — confirmed by manual run and by
+  automated tests.
+- Confirmed via `mock_methods.get_revoked_log()` that the sandbox
+  execution genuinely invoked the mock function (`sg_id='db-prod-01'`
+  logged), not just that no exception was raised.
+- Confirmed the semantic-mismatch disclosure text is present in output
+  (`"not necessarily an actual security group"`) via a dedicated test,
+  so this honesty can't silently regress in a future edit.
+- `pytest -v` — **96/96 tests passed** (91 Day 2 tests retained + 5 new
+  self-heal-demo tests).
+
+## Not verified — Week 3 close-out
+
+- The remediation applied in `self-heal-demo` is explicitly **not**
+  claimed to be semantically correct for `public_db_exposure` drift —
+  see `CONTRACT.md`'s new open item. This demo proves the mechanism
+  (generate → execute) works, not that the fix is the right one.
+- Graph state is not actually mutated by the mock remediation call, so
+  the demo's final re-render still shows the original drift — this is
+  called out explicitly in the demo's own output, not hidden.
 
 ## Verified — Week 3 Day 2 (sandbox)
 

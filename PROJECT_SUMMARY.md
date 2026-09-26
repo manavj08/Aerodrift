@@ -2,8 +2,8 @@
 
 ## Quick overview
 Person C's CLI/dashboard/remediation workstream, merged with Person A's
-real ingestion and Person B's real graph builder. Currently at Week 3,
-Day 2 (sandbox built).
+real ingestion and Person B's real graph builder. Currently at Week 3
+close-out (full self-heal loop demo built).
 
 ## Tech stack
 - Python 3.10+
@@ -18,12 +18,14 @@ Day 2 (sandbox built).
   C's placeholder mock graph (real detection still Person B's to build)
 - Real (mock-graph) dashboard: topology table + drift-in-red highlighting
 - `mid-review-demo` — scripted Week 2 checkpoint walkthrough
+- **`self-heal-demo`** — full loop in one command: detect → generate →
+  execute in sandbox → re-render, timed
 - **`remediate`** — full loop: real AST-based code generation, executed
   in a restricted `exec()` sandbox against a mock remediation method
 - **Real ingestion → graph pipeline**: Person A's mock EC2 state flows
   through `adapter.py` into Person B's `build_graph()`, with the
   internet node correctly synthesized so path-finding works
-- 92 passing tests
+- 96 passing tests
 
 ## Known gaps (see CONTRACT.md)
 - `detect_drift()` is still Person C's placeholder logic — Person B has
@@ -34,6 +36,11 @@ Day 2 (sandbox built).
   `"SecurityGroup"` casing mismatch — needs a team decision
 - **`aerodrift/remediation/mock_methods.py` is Person C's placeholder**
   — Person A has not yet delivered real mock remediation methods
+- **`public_db_exposure` drift cannot be correctly remediated yet**:
+  `detect_drift()` reports the database as `affected_node`, but the only
+  mock method (`revoke_security_group_ingress`) expects a security
+  group id — needs a team decision (new mock method, or change what
+  `detect_drift()` reports)
 - PDF reports (`pdf_report.py`) still a stub (Week 4 work)
 - `aerodrift/ingestion/adapter.py` is explicitly temporary — delete once
   A and B agree on one real ingestion→graph shape

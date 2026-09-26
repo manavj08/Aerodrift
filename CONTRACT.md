@@ -108,6 +108,22 @@ call arguments.
 - [ ] `graph/contract.py`'s `NODE_FIELDS`/`EDGE_FIELDS` (Person B's own
       draft schema) were never cross-checked against this file or against
       Person A's ingestion schema — see the adapter note above.
+- [ ] **NEW (Week 3 close-out): `public_db_exposure` drift's
+      `affected_node` is not remediable by the only mock method that
+      exists.** `detect_drift()` reports the *database* node
+      (e.g. `db-prod-01`) as `affected_node` for this drift type, but
+      `revoke_security_group_ingress(sg_id, rule)` expects a security
+      group id, not a database id. `self-heal-demo` runs the call anyway
+      (passing the DB node as `sg_id`) to demonstrate the
+      generate→execute mechanism works, but this is NOT a semantically
+      correct fix. Two ways to resolve, need a team decision:
+      1. Person A adds a DB-specific mock method (e.g.
+         `restrict_database_public_access(db_id)`), and `codegen.py`
+         maps `public_db_exposure` to it instead; or
+      2. `detect_drift()` is changed to report the *security group*
+         that creates the exposing path (e.g. the SG between internet
+         and the DB) as `affected_node`, so the existing
+         `revoke_security_group_ingress` call is actually correct.
 
 ## 5. Sample data (for Week 1 dashboard preview)
 

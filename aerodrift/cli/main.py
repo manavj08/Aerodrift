@@ -112,6 +112,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Scripted joint-demo flow: drift a mock SG, detect, show red, timed (Week 2 checkpoint)",
     )
 
+    subparsers.add_parser(
+        "self-heal-demo",
+        help="Full loop: detect drift -> generate fix -> execute in sandbox -> re-render (Week 3 close-out)",
+    )
+
     return parser
 
 
@@ -178,6 +183,8 @@ def main(argv=None) -> int:
         render_shell(graph=graph, drifts=drifts)
     elif args.command == "mid-review-demo":
         run_mid_review_demo()
+    elif args.command == "self-heal-demo":
+        run_self_heal_demo()
 
     return 0
 
@@ -212,6 +219,71 @@ def run_mid_review_demo() -> None:
     elapsed = time.monotonic() - start
     print(f"Detection completed in {elapsed:.3f}s (target: <5s)\n")
 
+    render_shell(graph=graph, drifts=drifts)
+
+
+def run_self_heal_demo() -> None:
+    """Scripted flow for Week 3 close-out / Week 4 final-review rehearsal:
+    detect drift -> generate remediation code -> execute in sandbox ->
+    re-render showing the fix applied.
+
+    KNOWN LIMITATION, stated plainly rather than hidden: detect_drift()'s
+    "public_db_exposure" drift type reports the DATABASE node as
+    affected_node (e.g. "db-prod-01"), but the only mock remediation
+    method available (revoke_security_group_ingress) expects a security
+    group id. This demo calls it anyway, passing the affected_node as
+    sg_id, to show the generate->execute loop working end-to-end against
+    real (if semantically mismatched) drift data. It does NOT prove the
+    fix is the *correct* remediation for this drift type — that requires
+    either a DB-specific mock method from Person A, or detect_drift()
+    reporting the offending security group instead of the database.
+    This gap is documented in CONTRACT.md.
+    """
+    print("Step 1/4: Building topology...")
+    graph = build_mock_graph()
+
+    print("Step 2/4: Detecting drift...")
+    start = time.monotonic()
+    drifts = detect_drift(graph)
+    elapsed = time.monotonic() - start
+    print(f"Detection completed in {elapsed:.3f}s (target: <5s)")
+
+    if not drifts:
+        print("No drift detected — nothing to remediate.")
+        render_shell(graph=graph, drifts=drifts)
+        return
+
+    render_shell(graph=graph, drifts=drifts)
+
+    print(f"\nStep 3/4: Generating remediation code for {len(drifts)} drift(s)...")
+    allowed = {"revoke_security_group_ingress": revoke_security_group_ingress}
+    for drift in drifts:
+        node = drift.get("affected_node", "?")
+        try:
+            code = generate_remediation_code(drift)
+        except (UnsupportedDriftTypeError, MissingDriftFieldError) as exc:
+            print(f"  [{node}] could not generate remediation: {exc}")
+            continue
+
+        print(f"  [{node}] generated: {code}")
+        print(
+            f"  [{node}] NOTE: this calls revoke_security_group_ingress with "
+            f"'{node}' as sg_id — {node} is the affected resource per "
+            "detect_drift(), not necessarily an actual security group. "
+            "See this function's docstring / CONTRACT.md."
+        )
+
+        print(f"Step 4/4: Executing remediation for {node} in sandbox...")
+        try:
+            result = run_sandboxed(code, allowed)
+        except SandboxExecutionError as exc:
+            print(f"  [{node}] sandbox execution failed: {exc}")
+            continue
+        print(f"  [{node}] sandbox result: {result.get('status')} — {result.get('message', '')}")
+
+    print("\nSelf-heal loop complete. (Graph object itself is not mutated by")
+    print("the mock remediation call — re-render below still shows original drift;")
+    print("real state refresh depends on Person A's ingestion re-polling, Week 4 scope.)")
     render_shell(graph=graph, drifts=drifts)
 
 

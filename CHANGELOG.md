@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## Week 3 close-out
+- Added `self-heal-demo` CLI command: scripted, timed walkthrough of the
+  full loop (detect → generate → execute → re-render), rehearsing Week
+  4's final review ("full self-heal loop + PDF report").
+- Explicitly documented (in code, CLI output, and `CONTRACT.md`) that
+  `public_db_exposure` drift's `affected_node` (a database) cannot be
+  correctly remediated by the only mock method that exists
+  (`revoke_security_group_ingress`, which expects a security group) —
+  the demo still runs it to prove the mechanism, not the correctness.
+- Added 5 tests to `tests/test_cli.py`, including one asserting the
+  mismatch-disclosure text stays present.
+- Test suite: 92 → **96 passing**.
+
 ## Week 3, Day 2
 - Implemented real `sandbox.run_sandboxed()`: restricted `exec()`,
   minimal safe-builtins allowlist, only executes single-call statements

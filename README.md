@@ -4,7 +4,28 @@ Agentic cloud topology & remediation engine. This repo covers **Person C's**
 individual assignment: CLI, Rich dashboard, AST-based code generator,
 sandboxed executor, and PDF incident reports.
 
-Status: **Week 3, Day 2 — sandboxed executor built, 92 tests passing.**
+Status: **Week 3 close-out — full self-heal loop demo, 96 tests passing.**
+
+## What's here (Week 3 close-out, additive to Day 2)
+
+- New CLI command **`aerodrift self-heal-demo`** — the full loop in one
+  scripted, timed command: detect drift → generate remediation code →
+  execute in sandbox → re-render. Mirrors `mid-review-demo`'s format,
+  intended as rehearsal for Week 4's final review ("full self-heal loop
+  + PDF report").
+- **Honestly documents a real semantic gap** rather than hiding it:
+  `detect_drift()`'s `public_db_exposure` type reports the *database*
+  node as `affected_node`, but the only mock remediation method
+  (`revoke_security_group_ingress`) expects a security-group id. The
+  demo still runs the generate→execute loop against this data (to prove
+  the mechanism works end-to-end) but prints an explicit note that the
+  call is not necessarily semantically correct — this is flagged in
+  `CONTRACT.md` as something the team needs to resolve (either a
+  DB-specific mock method from Person A, or `detect_drift()` reporting
+  the offending security group instead of the database).
+- 5 new tests, including one that asserts the mismatch-disclosure text
+  is actually present (so this honesty can't silently regress).
+- Test suite expanded from 92 → 96 tests.
 
 ## What's here (Week 3 Day 2, additive to Day 1 + merge)
 
@@ -254,6 +275,7 @@ run.bat scan
 run.bat status
 run.bat demo
 run.bat mid-review-demo
+run.bat self-heal-demo
 run.bat remediate --sg-id sg-0a1b2c3 --rule "0.0.0.0/0:22/tcp"
 run.bat remediate --sg-id sg-123 --rule "0.0.0.0/0:80/tcp" --dry-run
 ```
@@ -280,7 +302,7 @@ venv\Scripts\activate
 pytest -v
 ```
 
-Expected: **92 passed**.
+Expected: **96 passed**.
 
 ## Folder structure
 
@@ -444,3 +466,22 @@ shape; changes after this point need team agreement.
       beyond `revoke_security_group_ingress`
 - [ ] Handle `indirect_exposure` drift type once its remediation
       mapping is defined by the team
+
+## Completed (Week 3 close-out)
+
+- [x] `self-heal-demo` CLI command — full detect → generate → execute →
+      re-render loop in one scripted, timed command
+- [x] Documented (not hidden) the `affected_node`-as-`sg_id` semantic
+      mismatch for `public_db_exposure` drift
+- [x] Test suite (96 tests passing)
+
+## Remaining into Week 4
+
+- [ ] **Resolve the `public_db_exposure` remediation mismatch**: either
+      Person A adds a DB-specific mock method, or `detect_drift()` is
+      changed to report the offending security group rather than the
+      database as `affected_node`
+- [ ] Build the PDF incident report generator (`pdf_report.py`) — Week 4
+- [ ] Final CLI polish and end-to-end integration — Week 4
+- [ ] Person A still owes real mock remediation methods; Person B still
+      owes a real (non-placeholder) `detect_drift()`
