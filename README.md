@@ -22,21 +22,15 @@ Status: **Week 2, Day 4 — mid-project review rehearsal.**
 
 ## What's here (Week 2 Day 3, additive to Day 2)
 
-- **`detect_drift()` placeholder is no longer a no-op.** It now does real
-  NetworkX path-finding from `0.0.0.0/0` to sensitive resources (currently:
-  `database` nodes) — the exact "is there a path from the Internet to
-  Database X?" use case from the project spec. `scan`/`status` now show
-  genuine drift on the mock graph **without needing `--demo-data`**.
-- Detects both direct exposure (`public_db_exposure` — internet edge
-  straight to the DB) and indirect exposure (`indirect_exposure` — DB
-  reachable via intermediate hops), reporting severity `critical` and a
-  contract-shaped drift object either way.
-- `--demo-data` is kept for testing against the fixed `SAMPLE_DRIFTS`
-  set, useful for consistent screenshots/demos independent of graph changes.
-- Added a performance test proving detection completes well under 5
-  seconds on a 500-node graph — relevant to the Week 2 mid-project
-  review checkpoint ("drift detection under 5 seconds").
-- Test suite expanded from 38 → 46 tests.
+- **`detect_drift()` finds internet-to-database paths** in the directed
+  NetworkX graph. Internet nodes are identified by their internet
+  resource type or `0.0.0.0/0` CIDR; private RDS/database nodes are the
+  sensitive targets.
+- Each finding reports the affected database, the shortest reachable
+  path, the edge port/protocol/direction details, type
+  `public-subnet-exposure`, and severity `high`.
+- Added tests for reachable paths, affected resources, drift metadata,
+  and the no-path case.
 
 ## What's here (Week 2 Day 2, additive to Day 1)
 
