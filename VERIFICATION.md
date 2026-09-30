@@ -1,302 +1,37 @@
-# Verification — Week 1 (complete) + Week 2 (complete) + Week 3 close-out + team merge/fix
+# Verification — v1.0.0
 
-## Verified — Week 3 close-out (self-heal-demo)
+What was actually run for the final release, and what was not.
 
-- `self-heal-demo` runs end-to-end: builds topology, detects drift,
-  times detection, generates remediation code for each drift, executes
-  it in the sandbox, and re-renders — confirmed by manual run and by
-  automated tests.
-- Confirmed via `mock_methods.get_revoked_log()` that the sandbox
-  execution genuinely invoked the mock function (`sg_id='db-prod-01'`
-  logged), not just that no exception was raised.
-- Confirmed the semantic-mismatch disclosure text is present in output
-  (`"not necessarily an actual security group"`) via a dedicated test,
-  so this honesty can't silently regress in a future edit.
-- `pytest -v` — **96/96 tests passed** (91 Day 2 tests retained + 5 new
-  self-heal-demo tests).
+## Verified
 
-## Not verified — Week 3 close-out
+* `python -m pytest -q` → **192 passed** (Python 3.12, boto3 1.43.92,
+  moto 5.2.3, networkx 3.6.1, rich 13.9.4, reportlab 4.4.10, pypdf 4.3.1).
+* `final-demo`: three manual SG changes (`open-db`, `open-all-app`,
+  `open-ssh`) detected **0.83 s** after the change at a 1 s poll interval
+  (ingest 31 ms, graph query 0.9 ms); all three revoked by AST-generated code
+  in the sandbox and verified healed (~0.04 s); legitimate rules (443/80 on
+  web-sg, app-sg→db-sg 5432, internal SSH) untouched; SQLite
+  `diff baseline latest` empty after healing; 3-page PDF rendered to images
+  and inspected (banner, summary, incident table, per-incident code boxes,
+  diff section, footers).
+* `mid-review-demo`: detection well under the 5 s target; drifted SG and DB
+  shown in red (asserted on rendered segment styles in `test_dashboard.py`).
+* Every CLI command is exercised by `tests/test_cli.py`, including the
+  refusal paths (`--live` without `--yes` → exit 2, `--sg-id` without
+  `--rule` → exit 2, `scan --live --inject` → exit 2) and history/diff/report
+  against a database produced by a real daemon run.
+* Sandbox: rejects imports, extra statements, dunder names, non-literal
+  arguments, disallowed actions and injection attempts through drift ids /
+  rule text (`test_sandbox.py`, `test_codegen.py`).
+* Performance: `detect_drift` with a baseline on a 20k-node synthetic graph
+  runs in < 0.5 s (was 22 s before the BFS fix).
+* Dashboard renders without broken borders at 90, 120 and 160+ columns.
 
-- The remediation applied in `self-heal-demo` is explicitly **not**
-  claimed to be semantically correct for `public_db_exposure` drift —
-  see `CONTRACT.md`'s new open item. This demo proves the mechanism
-  (generate → execute) works, not that the fix is the right one.
-- Graph state is not actually mutated by the mock remediation call, so
-  the demo's final re-render still shows the original drift — this is
-  called out explicitly in the demo's own output, not hidden.
+## Not verified
 
-## Verified — Week 3 Day 2 (sandbox)
-
-- `run_sandboxed()` correctly executes `codegen.py`'s generated output
-  against `mock_methods.revoke_security_group_ingress()` and returns its
-  real result — confirmed both via unit test and by asserting on the
-  mock's in-memory call log (proves the function was actually invoked,
-  not just that no exception was raised).
-- Confirmed the sandbox rejects, with `SandboxExecutionError`: calls to
-  functions not in `allowed_globals` (including `open`, `eval`,
-  `__import__`), multiple statements, non-call expressions, and invalid
-  syntax.
-- Directly inspected `_SAFE_BUILTINS` and confirmed `open`, `eval`,
-  `exec`, `compile`, `getattr`, `setattr`, `__import__`, and
-  `__build_class__` are all absent.
-- `aerodrift remediate --sg-id ... --rule ...` (no `--dry-run`) visually
-  confirmed to generate code, execute it, and print the mock function's
-  real success message; `--dry-run` confirmed to stop before execution.
-- `pytest -v` — **92/92 tests passed** (76 merge/fix tests retained + 13
-  new sandbox tests + 4 new mock_methods placeholder tests, minus the
-  old `remediate` stub-output test replaced with two real-execution tests).
-
-## Not verified — Week 3 Day 2
-
-- **Person A's real mock remediation methods do not exist yet.** The
-  sandbox has only ever executed against Person C's own
-  `mock_methods.py` placeholder — signature compatibility with A's real
-  module is unverified until delivered.
-- The sandbox's security model is explicitly documented as
-  defense-in-depth, not a claim of a fully secure CPython sandbox (see
-  `sandbox.py`'s module docstring) — it has not been red-teamed beyond
-  the specific bypass attempts covered in the test suite (import, eval,
-  disallowed calls, multi-statement injection).
-- Only one remediation function is supported end-to-end; behavior with
-  additional mock methods (once Person A adds them) is unverified.
-
-## Verified — team merge + adapter fix
-
-- Ran the merged team submission's own test suite (72 tests) directly —
-  confirmed genuinely passing, not just claimed in its docs.
-- Independently ran the real pipeline by hand (`get_mock_ec2_state()` →
-  `resources_to_graph_input()` → `build_graph()` → `detect_drift()`) and
-  observed it return `[]` despite the mock data having an open
-  `0.0.0.0/0:22` SG rule — this is what surfaced the bug.
-- After the fix: confirmed the adapter now produces an
-  `INTERNET_NODE` (`"0.0.0.0/0"`) resource dict and a matching inbound
-  connection dict whenever a resource's `ingress` attribute shows a
-  public CIDR.
-- Confirmed via `nx.has_path()` that the built graph now has a real path
-  from the internet node to the security group.
-- Confirmed (and deliberately did NOT hide) that `detect_drift()` still
-  returns `[]` on this pipeline, due to the separate
-  `SENSITIVE_RESOURCE_TYPES`/casing gap — captured as an explicit,
-  clearly-labeled test rather than a silently-passing one.
-- `pytest -v` — **76/76 tests passed** (72 merge tests retained + 4 new
-  adapter tests; 1 pre-existing test corrected for the new node/edge count).
-
-## Not verified — team merge + adapter fix
-
-- The `"{cidr}:{port}"` ingress string format the fix parses is specific
-  to Person A's current `mock_client.py` — if A's real (non-mock)
-  ingestion produces ingress data in a different shape, this workaround
-  will not recognize it and needs revisiting.
-- Whether an internet-facing `SecurityGroup` should itself count as
-  drift (vs. only flagging when it fronts a sensitive resource) is an
-  unresolved team/product decision — not something this fix attempts to
-  answer.
-- Person B's real `detect_drift()` implementation does not exist yet;
-  all of the above is verified only against Person C's placeholder
-  detection logic.
-
-## Verified — Week 3 Day 1
-
-- `generate_remediation_code()` produces syntactically valid, executable
-  Python for both `open_ingress` and `public_db_exposure` drift types —
-  confirmed by parsing the output with `ast.parse()` and by actually
-  `exec()`-ing it against a mock function and checking the call args.
-- Unsupported drift type (`indirect_exposure`) correctly raises
-  `UnsupportedDriftTypeError` instead of generating incorrect code.
-- Missing `type`, `affected_node`, `offending_edge`, or
-  `offending_edge.rule` each correctly raise `MissingDriftFieldError`.
-- Injection-safety: a `rule` value containing a quote-and-statement
-  injection attempt still parses as a single safe call expression, not
-  multiple statements — confirmed via `ast.parse()` producing exactly
-  one `ast.Expr` in `tree.body`.
-- `aerodrift remediate --sg-id ... --rule ...` visually confirmed to
-  print the generated code correctly, with `--dry-run` clearly labeled
-  as not executing.
-- `pytest -v` — **63/63 tests passed** (53 Week 2 tests retained/updated
-  + 11 new codegen tests, replacing the old `NotImplementedError` stub test).
-
-## Not verified — Week 3 Day 1
-
-- **Drift type names and the mock remediation signature are unconfirmed
-  by Person B/A** — built entirely against `CONTRACT.md`'s draft. If the
-  real contract uses different type strings or a different function
-  signature, this file needs rework.
-- No sandbox exists yet — generated code is never actually executed by
-  the CLI, only printed. Execution safety (restricted builtins, no
-  filesystem/network) is Day 2+ work.
-- Only one remediation function is supported; behavior once Person A
-  adds more mock methods (e.g. `detach_public_ip`) is unverified.
-
-## Verified — Week 2 Day 5
-
-- Topology table caps healthy-row display at 25 while always showing
-  every drifted node — confirmed via a synthetic oversized graph test.
-- `_drifted_node_ids()` confirmed to skip malformed entries (missing
-  `affected_node`, `None`, non-dict list items) without raising.
-- Full dashboard render re-checked visually after changes — drifted rows
-  still appear correctly, ordering unaffected for small graphs.
-- `pytest -v` — **53/53 tests passed** (50 Day 4 tests retained + 3 new
-  defensive-rendering tests).
-
-## Not verified — Week 2 Day 5
-
-- Truncation behavior against Person B's real graph shape/scale — only
-  tested with synthetic oversized mock graphs, not real AWS-scale data.
-- `--watch` continuous loop remains unimplemented (deferred, does not
-  block Week 3).
-
-## Verified — Week 2 Day 4
-
-- `mid-review-demo` runs end-to-end without error: builds baseline,
-  adds a new drifted SG fronting the DB, detects it, prints elapsed
-  detection time, and renders the final dashboard with the new resource
-  shown as `DRIFTED` — confirmed visually.
-- Detection time printed is well under 5 seconds on the mock graph
-  (sub-millisecond in this environment).
-- Dashboard correctly renders 2+ simultaneous drifted resources without
-  layout issues — confirmed via new multi-drift tests.
-- `pytest -v` — **50/50 tests passed** (46 Day 3 tests retained + 4 new
-  mid-review-demo and multi-drift tests).
-
-## Not verified — Week 2 Day 4
-
-- The scripted demo scenario (new SG fronting the DB) is Person C's
-  construction for rehearsal purposes — it has not been run as an
-  actual joint demo with Person A and Person B, and timing/behavior
-  against their real (non-mock) graph is unverified.
-- `--watch` continuous loop remains unimplemented.
-
-## Verified — Week 2 Day 3
-
-- `detect_drift()` correctly identifies the mock graph's direct
-  internet→DB edge as `public_db_exposure`, confirmed both via unit
-  tests and visual dashboard inspection.
-- Indirect exposure (DB reachable via an intermediate hop, no direct
-  edge) correctly classified as `indirect_exposure`, reporting the first
-  hop as the offending edge.
-- Non-sensitive resources (e.g. `ec2`) reachable from the internet are
-  correctly NOT reported as drift (only `database` is in
-  `SENSITIVE_RESOURCE_TYPES` currently).
-- Graphs without the internet node, or with no path to any sensitive
-  node, correctly return `[]`.
-- **Performance**: detection on a 500-node synthetic graph completes in
-  well under 5 seconds (measured, not estimated) — satisfies the
-  Week 2 mid-project review checkpoint on the placeholder graph.
-- `pytest -v` — **46/46 tests passed** (38 Day 2 tests retained/updated +
-  8 new detection + performance tests).
-
-## Not verified — Week 2 Day 3
-
-- Performance against Person B's **real, potentially much larger**
-  cloud graph — only tested against a synthetic 500-node chain, not real
-  AWS-scale topology.
-- `SENSITIVE_RESOURCE_TYPES` currently only includes `database` — if the
-  real contract requires more resource types (e.g. S3 buckets, secrets
-  managers) as "sensitive," this needs updating once confirmed with B.
-
-## Verified — Week 2 Day 2
-
-- `scan` (no flags) renders the dashboard via the real pipeline, showing
-  all-healthy since `detect_drift()` placeholder returns `[]` — confirmed
-  visually.
-- `scan --demo-data` shows drifted rows in red — confirmed visually.
-- `status --demo-data` prints readable drift lines; `status --json
-  --demo-data` returns valid parseable JSON matching `SAMPLE_DRIFTS`.
-- `status --json` (no demo data) returns `[]`.
-- `pytest -v` — **38/38 tests passed** (34 Day 1 tests retained + 4 new
-  scan/status pipeline tests, replacing 2 stale stub-assertion tests).
-
-## Not verified — Week 2 Day 2
-
-- `--watch` continuous loop — not implemented, flag only prints a note.
-- Real drift detection end-to-end — still blocked on Person B's actual
-  `detect_drift()` implementation; today's wiring is verified only
-  against the placeholder (empty) and `--demo-data` paths.
-
-## Verified — Week 2 Day 1
-
-- `aerodrift demo` visually confirmed: topology table shows 4 mock
-  resources, `sg-0a1b2c3` and `db-prod-01` render with red `DRIFTED`
-  status, others show green `healthy`.
-- `_build_topology_panel()` correctly falls back to "(no data yet)" when
-  `graph=None` or the graph is empty.
-- `pytest -v` — **34/34 tests passed** (27 Week 1 tests retained + 4 new
-  graph-placeholder tests + 3 new dashboard rendering tests).
-
-## Not verified — Week 2 Day 1
-
-- Rendering against Person B's **real** graph — only tested against
-  Person C's own placeholder mock graph. Behavior with B's actual node/
-  edge attribute names is unverified until B delivers and this file's
-  `build_mock_graph()` swap point is replaced.
-- Performance at scale (large graphs) — mock graph has only 4 nodes.
-
-## Verified — Day 5
-
-- `aerodrift demo` renders the dashboard in the drifted state (visually
-  confirmed: red drift panel, sample resources listed).
-- `aerodrift demo --healthy` renders the healthy state.
-- `pytest -v` — **27/27 tests passed** (25 Day 1-4 tests retained + 2 new
-  `demo` command tests).
-
-## Not verified — Day 5
-
-- `CONTRACT.md` is marked locked per Person C's own workstream, but has
-  **not been confirmed in an actual meeting** with Person A and Person B
-  in this environment (no multi-person sync occurred here). Treat the
-  "locked" status as Person C's readiness checkpoint — still confirm
-  with your teammates before Week 2 work depends on it.
-
-## Verified — Day 3-4
-
-- `build_layout(drifts=[])` renders the healthy state without error.
-- `build_layout(drifts=[{...}])` renders the drifted state without error.
-- Each dashboard helper (`_build_header`, `_build_topology_panel`,
-  `_build_drift_list_panel`, `_build_footer`) builds independently.
-- `pytest -v` — **25/25 tests passed** (16 Day 1-2 tests retained + 9 new
-  dashboard tests).
-
-## Not verified — Day 3-4
-
-- `CONTRACT.md` field names/types are a **draft based on the project
-  spec**, not confirmed with Person A/B in an actual meeting. Update the
-  file and re-verify against their real modules once available.
-- Dashboard drift-aware styling has not been visually reviewed against
-  real drift data (no real data exists yet — Week 2 work).
-
-## Verified — Day 2
-
-- All 4 CLI commands accept and correctly handle their new flags
-  (`--watch`, `--json`, `--sg-id`/`--rule`/`--dry-run`, `--output`).
-- `remediate` without `--sg-id`/`--rule` exits with code 2 and prints an
-  error to stderr (validated, not just argparse's own error).
-- `--verbose` and `--version` global flags work.
-- `pytest -v` — **16/16 tests passed** (7 Day 1 tests retained + 9 new).
-
-## Verified — Day 1
-
-- `python -m venv venv` succeeds.
-- `pip install -r requirements.txt` succeeds (rich, networkx, pytest).
-- `python -m aerodrift.cli.main scan` runs, exits 0, prints stub message.
-- `python -m aerodrift.cli.main status` runs, exits 0, prints stub message.
-- `aerodrift.cli.dashboard.build_layout()` builds a `rich.layout.Layout`
-  with header/topology/drift_list/footer regions, no errors.
-- `pytest -v` — **7/7 tests passed**:
-  - `test_cli.py` (3 tests) — CLI commands run, missing command exits non-zero
-  - `test_dashboard.py` (2 tests) — layout builds, regions exist
-  - `test_codegen.py` (1 test) — confirms `NotImplementedError` (expected, Week 3 work)
-  - `test_sandbox.py` (1 test) — confirms `NotImplementedError` (expected, Week 3 work)
-
-## Not verified (out of scope for Day 1)
-
-- `remediate` and `report` CLI commands — stub print only, no real logic yet.
-- Dashboard with live data — Week 2 work.
-- `.bat` scripts were not run in this environment (Linux sandbox); logic is
-  standard venv activation + pip install / pytest invocation, verified
-  equivalent commands manually on Linux. Test on Windows before relying on them.
-
-## Known limitations
-
-- `ingestion/mock_aws.py` and `graph/topology.py` are placeholders owned by
-  Person C only to unblock standalone testing — they must be replaced with
-  Person A's and Person B's real modules once shared.
+* **Real AWS.** The `--live` path uses the same collector and remediation
+  code as the simulator, but it has not been run against a real account.
+  Start read-only: `scan --live` / `daemon --live --no-heal`.
+* The `.bat` scripts were not run on Windows.
+* Exposure is inferred from security groups only (no route-table / IGW /
+  NACL / public-IP checks) — see README → Known limitations.

@@ -1,113 +1,93 @@
-"""Tests for aerodrift.remediation.codegen — Week 3 Day 1.
-
-Built against the CONTRACT.md DRAFT (not yet confirmed by Person B).
-Re-verify these tests once B's real contract lands.
-"""
-
 import ast
 
 import pytest
 
+from aerodrift.graph.topology import detect_drift
 from aerodrift.remediation.codegen import (
-    generate_remediation_code,
     MissingDriftFieldError,
     UnsupportedDriftTypeError,
+    build_remediation_ast,
+    generate_remediation_code,
+    remediation_plan,
 )
+from aerodrift.remediation.sandbox import validate_remediation_code
 
 
-def _drift(**overrides):
-    base = {
-        "drift_id": "drift-001",
-        "type": "public_db_exposure",
-        "affected_node": "db-prod-01",
-        "offending_edge": {"source": "0.0.0.0/0", "target": "db-prod-01", "rule": "0.0.0.0/0:5432/tcp"},
-        "severity": "critical",
-        "detected_at": "2026-09-10T09:00:00Z",
-    }
-    base.update(overrides)
-    return base
+def drift(**over):
+    d = {"drift_id": "drift-abc123", "type": "public_db_exposure", "affected_node": "sg-db",
+         "affected_name": "db-sg", "offending_edge": {"source": "0.0.0.0/0", "target": "sg-db",
+                                                       "rule": "0.0.0.0/0:5432/tcp"}}
+    d.update(over)
+    return d
 
 
-def test_generates_correct_function_call_for_public_db_exposure():
-    code = generate_remediation_code(_drift())
-    assert code == "revoke_security_group_ingress(sg_id='db-prod-01', rule='0.0.0.0/0:5432/tcp')"
+def _call(code):
+    fn = ast.parse(code).body[0]
+    return fn, fn.body[-1].value
 
 
-def test_generates_correct_function_call_for_open_ingress():
-    drift = _drift(
-        type="open_ingress",
-        affected_node="sg-0a1b2c3",
-        offending_edge={"source": "0.0.0.0/0", "target": "sg-0a1b2c3", "rule": "0.0.0.0/0:22/tcp"},
-    )
-    code = generate_remediation_code(drift)
-    assert code == "revoke_security_group_ingress(sg_id='sg-0a1b2c3', rule='0.0.0.0/0:22/tcp')"
+def test_generates_a_single_function_with_a_boto3_call():
+    code = generate_remediation_code(drift())
+    fn, call = _call(code)
+    assert isinstance(fn, ast.FunctionDef) and fn.name == "remediate_drift_abc123"
+    assert [a.arg for a in fn.args.args] == ["ec2"]
+    assert call.func.attr == "revoke_security_group_ingress"
+    assert {k.arg: ast.literal_eval(k.value) for k in call.keywords} == {
+        "GroupId": "sg-db",
+        "IpPermissions": [{"IpProtocol": "tcp", "FromPort": 5432, "ToPort": 5432,
+                           "IpRanges": [{"CidrIp": "0.0.0.0/0"}]}]}
 
 
-def test_generated_code_is_valid_python():
-    code = generate_remediation_code(_drift())
-    # Should parse without raising — proves it's syntactically valid.
-    tree = ast.parse(code)
-    assert isinstance(tree.body[0], ast.Expr)
-    assert isinstance(tree.body[0].value, ast.Call)
-    assert tree.body[0].value.func.id == "revoke_security_group_ingress"
+def test_ast_is_built_not_templated():
+    module = build_remediation_ast(drift())
+    assert isinstance(module, ast.Module)
+    assert ast.unparse(module) == generate_remediation_code(drift())
 
 
-def test_generated_code_is_executable_against_mock_function():
-    calls = []
-
-    def revoke_security_group_ingress(sg_id, rule):
-        calls.append((sg_id, rule))
-        return {"status": "success", "message": "ok"}
-
-    code = generate_remediation_code(_drift())
-    exec(code, {"revoke_security_group_ingress": revoke_security_group_ingress})
-    assert calls == [("db-prod-01", "0.0.0.0/0:5432/tcp")]
+@pytest.mark.parametrize("dtype", ["public_db_exposure", "open_ingress", "indirect_exposure"])
+def test_every_drift_type_maps_to_revocation(dtype):
+    assert remediation_plan(drift(type=dtype))["action"] == "revoke_security_group_ingress"
 
 
-def test_unsupported_drift_type_raises():
+@pytest.mark.parametrize("rule,perm", [
+    ("0.0.0.0/0:all/all", {"IpProtocol": "-1", "IpRanges": [{"CidrIp": "0.0.0.0/0"}]}),
+    ("::/0:22/tcp", {"IpProtocol": "tcp", "FromPort": 22, "ToPort": 22, "Ipv6Ranges": [{"CidrIpv6": "::/0"}]}),
+    ("0.0.0.0/0:1000-2000/udp", {"IpProtocol": "udp", "FromPort": 1000, "ToPort": 2000,
+                                 "IpRanges": [{"CidrIp": "0.0.0.0/0"}]}),
+])
+def test_rule_variants(rule, perm):
+    plan = remediation_plan(drift(offending_edge={"rule": rule}))
+    assert plan["kwargs"]["IpPermissions"] == [perm]
+
+
+def test_rule_detail_is_preferred_over_rule_string():
+    d = drift(rule_detail={"source": "0.0.0.0/0", "protocol": "tcp", "from_port": 22, "to_port": 22,
+                           "source_kind": "cidr"})
+    assert remediation_plan(d)["kwargs"]["IpPermissions"][0]["FromPort"] == 22
+
+
+def test_generated_code_passes_sandbox_validation_for_detected_drift(mock_graph):
+    for d in detect_drift(mock_graph):
+        validate_remediation_code(generate_remediation_code(d))
+
+
+def test_injection_attempts_stay_inert_constants():
+    evil = "sg-1'); __import__('os').system('rm -rf /'); ('"
+    code = generate_remediation_code(drift(affected_node=evil, drift_id="x'); import os; ('"))
+    fn, call = _call(code)
+    assert len(ast.parse(code).body) == 1
+    assert ast.literal_eval(call.keywords[0].value) == evil
+    assert fn.name.isidentifier()
+    validate_remediation_code(code)  # still only a literal-only call
+
+
+def test_unsupported_drift_type():
     with pytest.raises(UnsupportedDriftTypeError):
-        generate_remediation_code(_drift(type="indirect_exposure"))
+        generate_remediation_code(drift(type="public_s3_bucket"))
 
 
-def test_missing_type_raises():
-    drift = _drift()
-    del drift["type"]
+@pytest.mark.parametrize("over", [{"type": None}, {"affected_node": None}, {"offending_edge": None},
+                                  {"offending_edge": {"source": "x"}}, {"offending_edge": {"rule": "garbage"}}])
+def test_missing_or_bad_fields(over):
     with pytest.raises(MissingDriftFieldError):
-        generate_remediation_code(drift)
-
-
-def test_missing_affected_node_raises():
-    drift = _drift()
-    del drift["affected_node"]
-    with pytest.raises(MissingDriftFieldError):
-        generate_remediation_code(drift)
-
-
-def test_missing_offending_edge_raises():
-    drift = _drift()
-    del drift["offending_edge"]
-    with pytest.raises(MissingDriftFieldError):
-        generate_remediation_code(drift)
-
-
-def test_missing_rule_in_offending_edge_raises():
-    drift = _drift(offending_edge={"source": "0.0.0.0/0", "target": "db-prod-01"})
-    with pytest.raises(MissingDriftFieldError):
-        generate_remediation_code(drift)
-
-
-def test_null_offending_edge_raises():
-    drift = _drift(offending_edge=None)
-    with pytest.raises(MissingDriftFieldError):
-        generate_remediation_code(drift)
-
-
-def test_handles_special_characters_in_rule_safely():
-    # Values go through ast.Constant, not string formatting, so quotes/
-    # injection attempts in the rule string can't break out of the call.
-    drift = _drift(offending_edge={"source": "x", "target": "db-prod-01", "rule": "0.0.0.0/0:22/tcp'); import os; os.system('rm -rf /'"})
-    code = generate_remediation_code(drift)
-    tree = ast.parse(code)
-    # Still parses as a single, safe call expression — not multiple statements.
-    assert len(tree.body) == 1
-    assert isinstance(tree.body[0].value, ast.Call)
+        generate_remediation_code(drift(**over))

@@ -1,5 +1,50 @@
 # CHANGELOG
 
+## v1.0.0 — Project completion
+- **Ingestion**: new `AWSCollector` (asyncio.gather + to_thread, semaphore,
+  pagination, multi-region, per-call timings) for VPCs, subnets, SGs, EC2
+  and RDS; `IngressRule` model; moto-backed `SimulatedCloud` with drift
+  scenarios `open-db`, `open-ssh`, `open-all-app`, `shadow-sg`.
+- **Graph**: `build_topology` with contains/attached/ingress edges, SG-reference
+  and private-CIDR expansion; real `detect_drift` (public DB exposure, admin/all
+  port exposure, baseline-aware multi-hop `indirect_exposure`); fixed a
+  quadratic path search (22 s → < 0.5 s on 20k nodes); topology diffs and
+  JSON (de)serialisation.
+- **Remediation**: `affected_node` is now the security group; AST code
+  generator; AST-allowlist sandbox with empty builtins and a scoped client;
+  function names collapse repeated underscores so hostile drift ids can
+  never produce dunder names.
+- **Persistence**: SQLite snapshot/incident store with diff by id,
+  `baseline`, `latest` or timestamp.
+- **Daemon**: poll → detect → heal → immediate verify → persist loop.
+- **CLI**: `scan --watch/--heal/--inject`, `status`, `remediate`, `daemon`,
+  `history`, `diff`, `report --from-db`, `mid-review-demo`, `self-heal-demo`,
+  `final-demo`; `--live` changes require `--yes`; `python -m aerodrift`.
+- **Dashboard**: full topology tree with per-rule ✓/✗, attack paths,
+  remediation log; stacks panels on terminals narrower than 150 columns.
+- **PDF**: status banner, executive summary, per-incident detail with the
+  generated code, topology diffs.
+- Removed `ingestion/adapter.py`, `remediation/mock_methods.py` and their tests.
+- Tests: 192 passing (dashboard, PDF and CLI suites rewritten).
+
+## Week 4
+- Wired the `report` CLI command to `generate_incident_report()`: detects
+  drift (or uses `--sg-id`/`--rule`), generates remediation code, runs it
+  in the sandbox (skippable with `--no-execute`), writes a real PDF.
+  `--sg-id` without `--rule` (or the reverse) exits 2 with an error.
+- Added `final-demo` CLI command: detect -> generate -> execute -> PDF
+  report, per the Week 4 Definition of Done.
+- Replaced the two stub-output `report` tests (which would now write PDFs
+  into the working directory) with `tmp_path`-based tests that check the
+  file is a real PDF; added tests for targeting, error paths, and that
+  `--no-execute` really does not invoke the mock remediation.
+- Added 4 `final-demo` tests.
+- Extended the `public_db_exposure` open item in `CONTRACT.md` to note
+  the mismatch now also lands in the generated PDF, and added an
+  ownership table (section 4b) recording which Person A / Person B
+  deliverables are still placeholders or absent.
+- Test suite: 96 -> **115 passing**.
+
 ## Week 3 close-out
 - Added `self-heal-demo` CLI command: scripted, timed walkthrough of the
   full loop (detect → generate → execute → re-render), rehearsing Week

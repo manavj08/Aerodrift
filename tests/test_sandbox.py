@@ -1,131 +1,128 @@
-"""Tests for aerodrift.remediation.sandbox — Week 3 Day 2.
-
-Covers both correctness (does the sandbox correctly run allowed code)
-and security (does it correctly block disallowed code).
-"""
-
 import pytest
 
-from aerodrift.remediation.sandbox import run_sandboxed, SandboxExecutionError
-from aerodrift.remediation.mock_methods import (
-    revoke_security_group_ingress,
-    clear_revoked_log,
-    get_revoked_log,
+from aerodrift.remediation.codegen import generate_remediation_code
+from aerodrift.remediation.sandbox import (
+    ScopedClient,
+    SandboxViolation,
+    run_remediation,
+    validate_remediation_code,
 )
 
-
-@pytest.fixture(autouse=True)
-def _reset_mock_log():
-    clear_revoked_log()
-    yield
-    clear_revoked_log()
+GOOD = ("def remediate_x(ec2):\n    'doc'\n    return ec2.revoke_security_group_ingress("
+        "GroupId='sg-1', IpPermissions=[{'IpProtocol': 'tcp', 'FromPort': 22, 'ToPort': 22, "
+        "'IpRanges': [{'CidrIp': '0.0.0.0/0'}]}])")
 
 
-ALLOWED = {"revoke_security_group_ingress": revoke_security_group_ingress}
+class FakeEC2:
+    def __init__(self, exc=None):
+        self.calls, self.exc = [], exc
+
+    def revoke_security_group_ingress(self, **kw):
+        self.calls.append(kw)
+        if self.exc:
+            raise self.exc
+        return {"Return": True, "ResponseMetadata": {"x": 1}}
+
+    def delete_vpc(self, **kw):
+        raise AssertionError("must never be reachable")
 
 
-# --- Correctness ---------------------------------------------------------
+def test_valid_code_passes():
+    assert validate_remediation_code(GOOD) == ("remediate_x", "revoke_security_group_ingress")
 
-def test_runs_allowed_call_and_returns_mock_result():
-    code = "revoke_security_group_ingress(sg_id='sg-1', rule='0.0.0.0/0:22/tcp')"
-    result = run_sandboxed(code, ALLOWED)
+
+@pytest.mark.parametrize("code,msg", [
+    ("x = 1", "exactly one function"),
+    (GOOD + "\nprint(1)", "exactly one function"),
+    ("import os", "exactly one function"),
+    ("def evil(ec2):\n    return ec2.revoke_security_group_ingress()", "must start with"),
+    ("def remediate__init__(ec2):\n    return ec2.revoke_security_group_ingress()", "must start with"),
+    ("@d\ndef remediate_x(ec2):\n    return ec2.revoke_security_group_ingress()", "decorators"),
+    ("def remediate_x(ec2, os):\n    return ec2.revoke_security_group_ingress()", "exactly one parameter"),
+    ("def remediate_x(ec2=1):\n    return ec2.revoke_security_group_ingress()", "exactly one parameter"),
+    ("def remediate_x(*a):\n    return 1", "exactly one parameter"),
+    ("def remediate_x(ec2):\n    import os\n    return ec2.revoke_security_group_ingress()", "single `return"),
+    ("def remediate_x(ec2):\n    for i in []: pass\n    return 1", "single `return"),
+    ("def remediate_x(ec2):\n    return ec2.delete_vpc(VpcId='v')", "not in the allowed set"),
+    ("def remediate_x(ec2):\n    return open('/etc/passwd')", "only methods on"),
+    ("def remediate_x(ec2):\n    return ec2.meta.client.delete_vpc()", "only methods on"),
+    ("def remediate_x(ec2):\n    return ec2.revoke_security_group_ingress('sg')", "positional"),
+    ("def remediate_x(ec2):\n    return ec2.revoke_security_group_ingress(**{'a': 1})", "kwargs"),
+    ("def remediate_x(ec2):\n    return ec2.revoke_security_group_ingress(GroupId=__import__('os'))", "literal"),
+    ("def remediate_x(ec2):\n    return ec2.revoke_security_group_ingress(GroupId=ec2.__class__)", "literal"),
+    ("def remediate_x(ec2):\n    return ec2.revoke_security_group_ingress(GroupId=[x for x in ()])", "literal"),
+    ("def remediate_x(ec2):\n    return ec2.revoke_security_group_ingress(GroupId=lambda: 1)", "literal"),
+    ("def remediate_x(ec2):\n    return ec2.revoke_security_group_ingress(GroupId={**{}})", "literal"),
+    ("def (:", "not valid Python"),
+])
+def test_validator_rejects(code, msg):
+    with pytest.raises(SandboxViolation, match=msg):
+        validate_remediation_code(code)
+
+
+def test_rejected_code_is_never_executed():
+    ec2 = FakeEC2()
+    with pytest.raises(SandboxViolation):
+        run_remediation("def remediate_x(ec2):\n    return ec2.delete_vpc(VpcId='v')", ec2)
+    assert ec2.calls == []
+
+
+def test_executes_and_strips_response_metadata():
+    ec2 = FakeEC2()
+    result = run_remediation(GOOD, ec2)
     assert result["status"] == "success"
-    assert "sg-1" in result["message"]
+    assert result["response"] == {"Return": True}
+    assert ec2.calls == [{"GroupId": "sg-1", "IpPermissions": [
+        {"IpProtocol": "tcp", "FromPort": 22, "ToPort": 22, "IpRanges": [{"CidrIp": "0.0.0.0/0"}]}]}]
+    assert result["calls"][0]["action"] == "revoke_security_group_ingress"
 
 
-def test_runs_allowed_call_and_actually_invokes_the_mock_function():
-    code = "revoke_security_group_ingress(sg_id='sg-2', rule='0.0.0.0/0:80/tcp')"
-    run_sandboxed(code, ALLOWED)
-    log = get_revoked_log()
-    assert log == [{"sg_id": "sg-2", "rule": "0.0.0.0/0:80/tcp"}]
+def test_dry_run_validates_without_calling():
+    ec2 = FakeEC2()
+    assert run_remediation(GOOD, ec2, dry_run=True)["status"] == "validated"
+    assert ec2.calls == []
 
 
-def test_integrates_with_codegen_output():
-    """End-to-end: codegen -> sandbox, matching the real remediate flow."""
-    from aerodrift.remediation.codegen import generate_remediation_code
+def test_missing_rule_is_a_noop_not_a_failure():
+    class NotFound(Exception):
+        response = {"Error": {"Code": "InvalidPermission.NotFound"}}
+    assert run_remediation(GOOD, FakeEC2(NotFound("gone")))["status"] == "noop"
 
-    drift = {
-        "type": "open_ingress",
-        "affected_node": "sg-0a1b2c3",
-        "offending_edge": {"source": "0.0.0.0/0", "target": "sg-0a1b2c3", "rule": "0.0.0.0/0:22/tcp"},
-    }
-    code = generate_remediation_code(drift)
-    result = run_sandboxed(code, ALLOWED)
+
+def test_api_error_is_reported_as_failed():
+    class Denied(Exception):
+        response = {"Error": {"Code": "UnauthorizedOperation"}}
+    r = run_remediation(GOOD, FakeEC2(Denied("denied")))
+    assert r["status"] == "failed" and r["error_code"] == "UnauthorizedOperation"
+
+
+def test_scoped_client_blocks_everything_else():
+    scoped = ScopedClient(FakeEC2())
+    with pytest.raises(PermissionError):
+        scoped.delete_vpc
+    with pytest.raises(PermissionError):
+        scoped._client = None
+    assert scoped.revoke_security_group_ingress(GroupId="sg") == {"Return": True, "ResponseMetadata": {"x": 1}}
+
+
+def test_generated_code_runs_with_no_builtins():
+    # Even `len` is unavailable inside the sandbox namespace.
+    ec2 = FakeEC2()
+    run_remediation(GOOD, ec2)
+    code = "def remediate_x(ec2):\n    return ec2.revoke_security_group_ingress(GroupId=len)"
+    with pytest.raises(SandboxViolation):
+        run_remediation(code, ec2)
+
+
+def test_real_revocation_against_simulated_aws(cloud):
+    inj = cloud.inject_drift("open-db")
+    drift = {"drift_id": "drift-t", "type": "public_db_exposure", "affected_node": inj.group_id,
+             "offending_edge": {"rule": inj.rule}}
+    assert inj.rule in cloud.ingress_rules(inj.group_id)
+    result = run_remediation(generate_remediation_code(drift), cloud.ec2)
     assert result["status"] == "success"
-    assert get_revoked_log() == [{"sg_id": "sg-0a1b2c3", "rule": "0.0.0.0/0:22/tcp"}]
-
-
-def test_mock_function_failure_propagates_as_failed_status():
-    code = "revoke_security_group_ingress(sg_id='', rule='0.0.0.0/0:22/tcp')"
-    result = run_sandboxed(code, ALLOWED)
-    assert result["status"] == "failed"
-
-
-# --- Security: disallowed function calls ----------------------------------
-
-def test_rejects_call_to_function_not_in_allowed_set():
-    code = "some_other_function(sg_id='sg-1', rule='x')"
-    with pytest.raises(SandboxExecutionError, match="not in the allowed set"):
-        run_sandboxed(code, ALLOWED)
-
-
-def test_rejects_multiple_statements():
-    code = "revoke_security_group_ingress(sg_id='sg-1', rule='x')\nprint('extra')"
-    with pytest.raises(SandboxExecutionError, match="single function-call statement"):
-        run_sandboxed(code, ALLOWED)
-
-
-def test_rejects_non_call_expression():
-    code = "1 + 1"
-    with pytest.raises(SandboxExecutionError):
-        run_sandboxed(code, ALLOWED)
-
-
-def test_rejects_invalid_syntax():
-    code = "this is not : valid python(("
-    with pytest.raises(SandboxExecutionError, match="not valid Python"):
-        run_sandboxed(code, ALLOWED)
-
-
-# --- Security: restricted builtins -----------------------------------------
-
-def test_blocks_filesystem_access_via_open():
-    # `open` isn't in ALLOWED and isn't a safe builtin, so it's not
-    # reachable as a bare name call — but codegen only ever produces
-    # single-call statements against ALLOWED, so this also proves the
-    # allowed-function check catches it even before builtins matter.
-    code = "open('/etc/passwd', 'r')"
-    with pytest.raises(SandboxExecutionError, match="not in the allowed set"):
-        run_sandboxed(code, ALLOWED)
-
-
-def test_blocks_import_statement():
-    code = "import os"
-    with pytest.raises(SandboxExecutionError):
-        run_sandboxed(code, ALLOWED)
-
-
-def test_blocks_dunder_import_call():
-    code = "__import__('os')"
-    with pytest.raises(SandboxExecutionError, match="not in the allowed set"):
-        run_sandboxed(code, ALLOWED)
-
-
-def test_blocks_eval_call():
-    code = "eval('1+1')"
-    with pytest.raises(SandboxExecutionError, match="not in the allowed set"):
-        run_sandboxed(code, ALLOWED)
-
-
-def test_safe_builtins_do_not_expose_import():
-    """Directly verify __builtins__ inside the sandbox has no import-capable names."""
-    from aerodrift.remediation.sandbox import _SAFE_BUILTINS
-
-    assert "__import__" not in _SAFE_BUILTINS
-    assert "open" not in _SAFE_BUILTINS
-    assert "eval" not in _SAFE_BUILTINS
-    assert "exec" not in _SAFE_BUILTINS
-    assert "compile" not in _SAFE_BUILTINS
-    assert "getattr" not in _SAFE_BUILTINS
-    assert "setattr" not in _SAFE_BUILTINS
-    assert "__build_class__" not in _SAFE_BUILTINS
+    remaining = cloud.ingress_rules(inj.group_id)
+    assert inj.rule not in remaining
+    assert remaining == [f"{cloud.ids['sg_app']}:5432/tcp"]  # the legitimate rule survives
+    # second run: already gone -> noop
+    assert run_remediation(generate_remediation_code(drift), cloud.ec2)["status"] == "noop"

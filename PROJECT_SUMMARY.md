@@ -1,59 +1,26 @@
-# PROJECT_SUMMARY — AeroDrift (team merge: A + B + C)
+# AeroDrift — Project Summary (v1.0.0)
 
-## Quick overview
-Person C's CLI/dashboard/remediation workstream, merged with Person A's
-real ingestion and Person B's real graph builder. Currently at Week 3
-close-out (full self-heal loop demo built).
+**Status: complete.** Every item in the week-wise plan is implemented,
+tested (192 tests) and demonstrable offline.
 
-## Tech stack
-- Python 3.10+
-- Rich (CLI dashboard)
-- NetworkX (graph)
-- boto3 + moto (mock AWS ingestion — Person A)
-- pytest (testing)
-- argparse (CLI, stdlib)
+| Plan item | Where | Evidence |
+|---|---|---|
+| W1 async boto3 ingestion (VPC/EC2/subnet/SG) | `ingestion/collector.py` | concurrent + paginated + multi-region; `test_collector.py` |
+| W1 graph foundations | `graph/topology.py::build_topology` | `test_topology.py` |
+| W2 internet → private DB path detection | `graph/topology.py::detect_drift` | direct, admin-port and multi-hop drift; `test_topology.py` |
+| W2 Rich topology tree | `cli/dashboard.py` | `test_dashboard.py` |
+| Mid-review: manual SG change detected < 5 s | `mid-review-demo` | ~0.8 s; `test_daemon.py`, `test_cli.py` |
+| Mid-review: drifted resources in red | dashboard | segment-style test in `test_dashboard.py` |
+| W3 ast-generated `revoke_security_group_ingress` | `remediation/codegen.py` | `test_codegen.py` (incl. injection attempts) |
+| W3 controlled `exec()` sandbox | `remediation/sandbox.py` | `test_sandbox.py` |
+| W4 SQLite history + diff between timestamps | `persistence/store.py`, `history`, `diff` | `test_store.py`, `test_cli.py` |
+| W4 PDF incident reports | `reports/pdf_report.py`, `report` | `test_pdf_report.py` |
+| Final: autonomous self-healing | `daemon.py`, `daemon`, `final-demo` | `test_daemon.py`, `test_cli.py` |
 
-## What works today
-- `aerodrift scan` / `status` — graph + drift detection against Person
-  C's placeholder mock graph (real detection still Person B's to build)
-- Real (mock-graph) dashboard: topology table + drift-in-red highlighting
-- `mid-review-demo` — scripted Week 2 checkpoint walkthrough
-- **`self-heal-demo`** — full loop in one command: detect → generate →
-  execute in sandbox → re-render, timed
-- **`remediate`** — full loop: real AST-based code generation, executed
-  in a restricted `exec()` sandbox against a mock remediation method
-- **Real ingestion → graph pipeline**: Person A's mock EC2 state flows
-  through `adapter.py` into Person B's `build_graph()`, with the
-  internet node correctly synthesized so path-finding works
-- 96 passing tests
+Run `python -m aerodrift final-demo` to see the whole loop: three manual
+security-group changes are injected, detected within a second, remediated with
+generated code in the sandbox, verified, stored in SQLite (baseline → latest
+diff is empty after healing), and written to `final_incident_report.pdf`.
 
-## Known gaps (see CONTRACT.md)
-- `detect_drift()` is still Person C's placeholder logic — Person B has
-  not yet delivered real drift detection
-- Even with the pipeline fix, `detect_drift()` finds no drift on real
-  ingestion data yet: `SENSITIVE_RESOURCE_TYPES` doesn't cover security
-  groups, and there's an unresolved `"security_group"` vs
-  `"SecurityGroup"` casing mismatch — needs a team decision
-- **`aerodrift/remediation/mock_methods.py` is Person C's placeholder**
-  — Person A has not yet delivered real mock remediation methods
-- **`public_db_exposure` drift cannot be correctly remediated yet**:
-  `detect_drift()` reports the database as `affected_node`, but the only
-  mock method (`revoke_security_group_ingress`) expects a security
-  group id — needs a team decision (new mock method, or change what
-  `detect_drift()` reports)
-- PDF reports (`pdf_report.py`) still a stub (Week 4 work)
-- `aerodrift/ingestion/adapter.py` is explicitly temporary — delete once
-  A and B agree on one real ingestion→graph shape
-
-## Quick start
-```
-setup.bat
-run.bat demo
-run_tests.bat
-```
-
-## Important notes
-- `aerodrift/graph/topology.py`'s `detect_drift()` is still a placeholder
-  — swap for Person B's real detection logic as soon as it's available.
-- `aerodrift/remediation/mock_methods.py` is a placeholder — swap for
-  Person A's real mock remediation methods once delivered.
+Limitations are listed honestly in README.md → *Known limitations*; the main
+one is that the live-AWS path has not been exercised against a real account.

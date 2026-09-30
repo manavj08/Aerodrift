@@ -1,141 +1,109 @@
-"""Tests for aerodrift.cli.dashboard — Week 2 Day 1 real graph rendering."""
-
-import networkx as nx
-from rich.layout import Layout
+"""Rich dashboard rendering: topology tree, drift highlighting, panels, diff table."""
+from rich.console import Console
 
 from aerodrift.cli.dashboard import (
-    build_layout,
-    _build_header,
-    _build_topology_panel,
-    _build_drift_list_panel,
-    _build_footer,
-    _drifted_node_ids,
-    STATUS_HEALTHY,
-    STATUS_DRIFTED,
-    MAX_TOPOLOGY_ROWS,
+    _drifted_node_ids, _drifted_rules, build_dashboard,
+    build_diff_table, build_layout, build_topology_tree, render_dashboard,
 )
-from aerodrift.graph.topology import build_mock_graph
+from aerodrift.graph.topology import build_mock_graph, detect_drift, diff_topologies
 
 
-def test_build_layout_returns_layout():
-    layout = build_layout()
-    assert isinstance(layout, Layout)
+def _render(renderable, width=160, color=False):
+    con = Console(record=True, width=width, color_system="truecolor" if color else None, force_terminal=color)
+    con.print(renderable)
+    return con, con.export_text()
 
 
-def test_layout_has_expected_regions():
-    layout = build_layout()
-    assert layout["header"] is not None
-    assert layout["topology"] is not None
-    assert layout["drift_list"] is not None
-    assert layout["footer"] is not None
+def test_drifted_node_ids_includes_sg_and_target(mock_graph):
+    drifts = detect_drift(mock_graph)
+    ids = _drifted_node_ids(drifts)
+    assert "sg-db" in ids and "db-prod-01" in ids
 
 
-def test_build_layout_no_graph_no_drifts_is_healthy():
-    layout = build_layout()
-    assert layout is not None
+def test_drifted_node_ids_tolerates_malformed():
+    assert _drifted_node_ids(None) == set()
+    assert _drifted_node_ids(["junk", 3, None, {}, {"affected_node": None}]) == set()
+    assert _drifted_node_ids([{"affected_node": "sg-1"}]) == {"sg-1"}
 
 
-def test_build_layout_with_graph_and_drifts():
-    graph = build_mock_graph()
-    drifts = [
-        {"drift_id": "drift-001", "type": "open_ingress", "affected_node": "sg-0a1b2c3", "severity": "critical"}
-    ]
-    layout = build_layout(graph=graph, drifts=drifts)
-    assert layout is not None
+def test_drifted_rules(mock_graph):
+    rules = _drifted_rules(detect_drift(mock_graph))
+    assert any(sg == "sg-db" and "0.0.0.0/0" in rule for sg, rule in rules)
+    assert _drifted_rules([{"offending_edge": "not-a-dict"}]) == set()
 
 
-def test_header_builds():
-    assert _build_header() is not None
+def test_tree_contains_topology(mock_graph):
+    _, text = _render(build_topology_tree(mock_graph, detect_drift(mock_graph)))
+    for name in ("Internet", "vpc", "db-prod-01", "web-01", "app-01"):
+        assert name.lower() in text.lower()
 
 
-def test_drifted_node_ids_extracts_affected_nodes():
-    drifts = [{"affected_node": "sg-1"}, {"affected_node": "db-1"}, {}]
-    assert _drifted_node_ids(drifts) == {"sg-1", "db-1"}
+def test_drifted_resources_are_red(mock_graph):
+    drifts = detect_drift(mock_graph)
+    con = Console(width=160)
+    segments = list(con.render(build_topology_tree(mock_graph, drifts)))
+    red = [s.text for s in segments if s.style and s.style.color and s.style.color.name == "red"]
+    joined = " ".join(red)
+    assert "db-prod-01" in joined and "db-sg" in joined
+    assert "web-02" not in joined and "app-01" not in joined  # healthy resources stay plain
 
 
-def test_topology_panel_no_graph():
-    assert _build_topology_panel(graph=None, drifts=[]) is not None
+def test_healthy_tree_has_no_red_markers(healthy_graph):
+    _, text = _render(build_topology_tree(healthy_graph, detect_drift(healthy_graph)))
+    assert "✗" not in text
 
 
-def test_topology_panel_empty_graph():
-    assert _build_topology_panel(graph=nx.DiGraph(), drifts=[]) is not None
+def test_empty_graph_tree_renders():
+    _, text = _render(build_topology_tree(None, []))
+    assert text.strip()
 
 
-def test_topology_panel_renders_mock_graph_nodes():
-    graph = build_mock_graph()
-    panel = _build_topology_panel(graph=graph, drifts=[])
-    # Rendering shouldn't raise; node count should match graph nodes.
-    assert graph.number_of_nodes() == 4
+def test_dashboard_drifted_panels(mock_graph):
+    drifts = detect_drift(mock_graph)
+    _, text = _render(build_dashboard(mock_graph, drifts, info="hello-info", subtitle="sub-x"))
+    assert "hello-info" in text and "sub-x" in text
+    assert "DRIFT DETECTED" in text
+    assert "public_db_exposure" in text or "db exposure" in text.lower()
 
 
-def test_topology_panel_marks_drifted_node():
-    graph = build_mock_graph()
-    drifts = [{"affected_node": "db-prod-01"}]
-    panel = _build_topology_panel(graph=graph, drifts=drifts)
-    assert panel is not None
+def test_dashboard_healthy_status(healthy_graph):
+    _, text = _render(build_dashboard(healthy_graph, []))
+    assert "no drift detected" in text
 
 
-def test_topology_panel_marks_multiple_drifted_nodes():
-    graph = build_mock_graph()
-    graph.add_node("sg-2", resource_type="security_group")
-    drifts = [{"affected_node": "db-prod-01"}, {"affected_node": "sg-2"}]
-    drifted = _drifted_node_ids(drifts)
-    assert drifted == {"db-prod-01", "sg-2"}
-    panel = _build_topology_panel(graph=graph, drifts=drifts)
-    assert panel is not None
+def test_dashboard_with_records(mock_graph):
+    from aerodrift.remediation.engine import remediate
+    drifts = detect_drift(mock_graph)
+    records = [remediate(d, None, dry_run=True) for d in drifts]
+    _, text = _render(build_dashboard(mock_graph, drifts, records))
+    assert "validated" in text.lower()
 
 
-def test_drift_list_panel_with_multiple_entries():
-    drifts = [
-        {"type": "public_db_exposure", "severity": "critical", "affected_node": "db-prod-01"},
-        {"type": "open_ingress", "severity": "high", "affected_node": "sg-2"},
-    ]
-    panel = _build_drift_list_panel(drifts)
-    assert panel is not None
+def test_build_layout_alias():
+    assert build_layout is build_dashboard
 
 
-def test_drifted_node_ids_tolerates_malformed_entries():
-    drifts = [{"affected_node": "sg-1"}, {}, {"affected_node": None}, "not-a-dict"]
-    assert _drifted_node_ids(drifts) == {"sg-1"}
+def test_render_dashboard_to_console(mock_graph):
+    con = Console(record=True, width=160)
+    render_dashboard(mock_graph, detect_drift(mock_graph), out=con)
+    assert "db-prod-01" in con.export_text()
 
 
-def test_topology_panel_truncates_large_graphs():
-    import networkx as nx
-    graph = nx.DiGraph()
-    for i in range(MAX_TOPOLOGY_ROWS + 10):
-        graph.add_node(f"resource-{i}", resource_type="ec2")
-
-    panel = _build_topology_panel(graph=graph, drifts=[])
-    assert panel is not None
-    # Should not raise, and the table should have been capped — verified
-    # indirectly by ensuring the function completes without error on an
-    # oversized graph.
+def test_diff_table_shows_changes(mock_graph, healthy_graph):
+    diff = diff_topologies(healthy_graph, mock_graph)
+    _, text = _render(build_diff_table(diff, "before", "after"))
+    assert "0.0.0.0/0" in text
+    assert "exposed" in text.lower()
 
 
-def test_topology_panel_always_shows_drifted_nodes_even_if_many():
-    import networkx as nx
-    graph = nx.DiGraph()
-    for i in range(MAX_TOPOLOGY_ROWS + 5):
-        graph.add_node(f"resource-{i}", resource_type="ec2")
-    graph.add_node("db-drifted", resource_type="database")
-    drifts = [{"affected_node": "db-drifted"}]
-
-    panel = _build_topology_panel(graph=graph, drifts=drifts)
-    assert panel is not None
+def test_diff_table_empty(healthy_graph):
+    diff = diff_topologies(healthy_graph, healthy_graph)
+    assert diff.is_empty
+    _, text = _render(build_diff_table(diff))
+    assert "no" in text.lower()
 
 
-def test_drift_list_panel_empty():
-    assert _build_drift_list_panel([]) is not None
-
-
-def test_drift_list_panel_with_data():
-    drifts = [{"type": "open_ingress", "severity": "critical", "affected_node": "sg-1"}]
-    assert _build_drift_list_panel(drifts) is not None
-
-
-def test_footer_healthy():
-    assert _build_footer(STATUS_HEALTHY) is not None
-
-
-def test_footer_drifted():
-    assert _build_footer(STATUS_DRIFTED) is not None
+def test_narrow_terminal_stacks_panels(mock_graph):
+    _, text = _render(build_dashboard(mock_graph, detect_drift(mock_graph)), width=90)
+    assert "public_db_exposure" in text and "Attack paths" in text
+    assert max(len(l) for l in text.splitlines()) <= 90

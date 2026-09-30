@@ -1,220 +1,199 @@
-"""Tests for aerodrift.cli.main — Week 2 Day 2 CLI expansion."""
-
+"""End-to-end CLI tests (simulated cloud / offline data only)."""
 import json
 
 import pytest
+from pypdf import PdfReader
 
-from aerodrift.cli.main import main
-
-
-def test_cli_scan_runs(capsys):
-    exit_code = main(["scan"])
-    captured = capsys.readouterr()
-    assert exit_code == 0
-    assert "AeroDrift" in captured.out
+from aerodrift import __version__
+from aerodrift.cli.main import build_parser, main
 
 
-def test_cli_scan_watch_flag_notes_not_implemented(capsys):
-    exit_code = main(["scan", "--watch"])
-    captured = capsys.readouterr()
-    assert exit_code == 0
-    assert "not implemented" in captured.out
+@pytest.fixture(autouse=True)
+def wide_console(monkeypatch):
+    monkeypatch.setenv("COLUMNS", "200")
 
 
-def test_cli_scan_demo_data_shows_drift(capsys):
-    exit_code = main(["scan", "--demo-data"])
-    captured = capsys.readouterr()
-    assert exit_code == 0
-    assert "DRIFTED" in captured.out
+def run(capsys, *argv):
+    code = main(list(argv))
+    out = capsys.readouterr()
+    return code, out.out, out.err
 
 
-def test_cli_scan_real_detection_finds_mock_graph_drift(capsys):
-    # Real detect_drift() now finds the mock graph's internet->DB edge.
-    exit_code = main(["scan"])
-    captured = capsys.readouterr()
-    assert exit_code == 0
-    assert "DRIFTED" in captured.out
-
-
-def test_cli_status_runs(capsys):
-    exit_code = main(["status"])
-    captured = capsys.readouterr()
-    assert exit_code == 0
-    assert "db-prod-01" in captured.out
-    assert "critical" in captured.out
-
-
-def test_cli_status_demo_data(capsys):
-    exit_code = main(["status", "--demo-data"])
-    captured = capsys.readouterr()
-    assert exit_code == 0
-    assert "critical" in captured.out
-    assert "sg-0a1b2c3" in captured.out
-
-
-def test_cli_status_json_flag(capsys):
-    exit_code = main(["status", "--json", "--demo-data"])
-    captured = capsys.readouterr()
-    assert exit_code == 0
-    data = json.loads(captured.out)
-    assert isinstance(data, list)
-    assert data[0]["drift_id"] == "drift-001"
-
-
-def test_cli_status_json_real_detection(capsys):
-    exit_code = main(["status", "--json"])
-    captured = capsys.readouterr()
-    assert exit_code == 0
-    data = json.loads(captured.out)
-    assert len(data) == 1
-    assert data[0]["affected_node"] == "db-prod-01"
-
-
-def test_cli_status_json_empty_with_no_path_graph(monkeypatch, capsys):
-    # Force an empty graph to verify the JSON-empty path still works.
-    import networkx as nx
-    from aerodrift.cli import main as main_module
-
-    monkeypatch.setattr(main_module, "build_mock_graph", lambda: nx.DiGraph())
-    exit_code = main(["status", "--json"])
-    captured = capsys.readouterr()
-    assert exit_code == 0
-    assert json.loads(captured.out) == []
-
-
-def test_cli_remediate_requires_sg_and_rule(capsys):
-    exit_code = main(["remediate"])
-    captured = capsys.readouterr()
-    assert exit_code == 2
-    assert "required" in captured.err
-
-
-def test_cli_remediate_with_args_executes_in_sandbox(capsys):
-    exit_code = main(["remediate", "--sg-id", "sg-123", "--rule", "0.0.0.0/0:22"])
-    captured = capsys.readouterr()
-    assert exit_code == 0
-    assert "revoke_security_group_ingress" in captured.out
-    assert "sg-123" in captured.out
-    assert "0.0.0.0/0:22" in captured.out
-    assert "Executed in sandbox" in captured.out
-    assert "success" in captured.out
-
-
-def test_cli_remediate_dry_run_does_not_execute(capsys):
-    exit_code = main(
-        ["remediate", "--sg-id", "sg-123", "--rule", "0.0.0.0/0:22", "--dry-run"]
-    )
-    captured = capsys.readouterr()
-    assert exit_code == 0
-    assert "dry-run" in captured.out
-    assert "revoke_security_group_ingress" in captured.out
-    assert "Executed in sandbox" not in captured.out
-
-
-def test_cli_report_default_output(capsys):
-    exit_code = main(["report"])
-    captured = capsys.readouterr()
-    assert exit_code == 0
-    assert "incident_report.pdf" in captured.out
-
-
-def test_cli_report_custom_output(capsys):
-    exit_code = main(["report", "--output", "custom.pdf"])
-    captured = capsys.readouterr()
-    assert exit_code == 0
-    assert "custom.pdf" in captured.out
-
-
-def test_cli_verbose_flag(capsys):
-    exit_code = main(["--verbose", "scan"])
-    captured = capsys.readouterr()
-    assert exit_code == 0
-    assert "[verbose]" in captured.out
-
-
-def test_cli_version_flag():
-    with pytest.raises(SystemExit) as exc_info:
+def test_version(capsys):
+    with pytest.raises(SystemExit) as e:
         main(["--version"])
-    assert exc_info.value.code == 0
+    assert e.value.code == 0
+    assert __version__ in capsys.readouterr().out
 
 
-def test_cli_requires_command():
+def test_parser_requires_command():
     with pytest.raises(SystemExit):
-        main([])
+        build_parser().parse_args([])
 
 
-def test_cli_demo_runs_with_drift(capsys):
-    exit_code = main(["demo"])
-    captured = capsys.readouterr()
-    assert exit_code == 0
-    assert "AeroDrift" in captured.out
-    assert "db-prod-01" in captured.out
+def test_demo_drifted_and_healthy(capsys):
+    code, out, _ = run(capsys, "demo")
+    assert code == 0 and "DRIFT DETECTED" in out and "db-prod-01" in out
+    code, out, _ = run(capsys, "demo", "--healthy")
+    assert code == 0 and "no drift detected" in out
 
 
-def test_cli_demo_healthy_runs(capsys):
-    exit_code = main(["demo", "--healthy"])
-    captured = capsys.readouterr()
-    assert exit_code == 0
-    assert "AeroDrift" in captured.out
-    assert "healthy" in captured.out
+def test_scan_offline(capsys):
+    code, out, _ = run(capsys, "scan", "--offline")
+    assert code == 0 and "public_db_exposure" in out
 
 
-def test_cli_mid_review_demo_runs(capsys):
-    exit_code = main(["mid-review-demo"])
-    captured = capsys.readouterr()
-    assert exit_code == 0
-    assert "Step 1/3" in captured.out
-    assert "Step 2/3" in captured.out
-    assert "Step 3/3" in captured.out
-    assert "Detection completed in" in captured.out
-    assert "sg-drift-demo" in captured.out
+def test_scan_simulated_clean(capsys):
+    code, out, _ = run(capsys, "scan")
+    assert code == 0 and "no drift detected" in out and "ingest" in out
 
 
-def test_cli_mid_review_demo_shows_new_drift(capsys):
-    exit_code = main(["mid-review-demo"])
-    captured = capsys.readouterr()
-    assert exit_code == 0
-    # After the simulated drift, sg-drift-demo should appear as DRIFTED
-    # in the final rendered dashboard (it fronts the DB).
-    assert "sg-drift-demo" in captured.out
-    assert "DRIFTED" in captured.out
+def test_scan_simulated_with_scenario(capsys):
+    code, out, _ = run(capsys, "scan", "--scenario", "open-db")
+    assert code == 0 and "DRIFT DETECTED" in out and "5432" in out
 
 
-def test_cli_self_heal_demo_runs(capsys):
-    exit_code = main(["self-heal-demo"])
-    captured = capsys.readouterr()
-    assert exit_code == 0
-    assert "Step 1/4" in captured.out
-    assert "Step 2/4" in captured.out
-    assert "Step 3/4" in captured.out
-    assert "Step 4/4" in captured.out
-    assert "Detection completed in" in captured.out
+def test_scan_live_rejects_inject(capsys):
+    code, _, err = run(capsys, "scan", "--live", "--inject", "open-db")
+    assert code == 2 and "--inject" in err
 
 
-def test_cli_self_heal_demo_generates_and_executes_remediation(capsys):
-    exit_code = main(["self-heal-demo"])
-    captured = capsys.readouterr()
-    assert exit_code == 0
-    assert "revoke_security_group_ingress" in captured.out
-    assert "sandbox result: success" in captured.out
-    assert "db-prod-01" in captured.out
+def test_scan_watch_heal_short(capsys):
+    code, out, _ = run(capsys, "scan", "--watch", "--heal", "--interval", "0.3", "--duration", "2.5",
+                       "--inject", "open-ssh", "--inject-after", "0.5")
+    assert code == 0
 
 
-def test_cli_self_heal_demo_flags_sg_id_mismatch_honestly(capsys):
-    # The demo must not silently pretend the DB node is a real SG — it
-    # should state the mismatch explicitly.
-    exit_code = main(["self-heal-demo"])
-    captured = capsys.readouterr()
-    assert exit_code == 0
-    assert "not necessarily an actual security group" in captured.out
+def test_status_json_offline(capsys):
+    code, out, _ = run(capsys, "status", "--offline", "--json")
+    data = json.loads(out)
+    assert code == 0 and {d["type"] for d in data} >= {"public_db_exposure"}
+    assert all(d["affected_node"].startswith("sg-") for d in data)
 
 
-def test_cli_self_heal_demo_calls_mock_remediation_for_real(capsys):
-    from aerodrift.remediation.mock_methods import get_revoked_log, clear_revoked_log
+def test_status_text_scenario(capsys):
+    code, out, _ = run(capsys, "status", "--scenario", "open-ssh")
+    assert code == 0 and "22" in out
 
-    clear_revoked_log()
-    main(["self-heal-demo"])
-    log = get_revoked_log()
-    assert len(log) == 1
-    assert log[0]["sg_id"] == "db-prod-01"
-    clear_revoked_log()
+
+def test_remediate_default_scenarios(capsys):
+    code, out, _ = run(capsys, "remediate")
+    assert code == 0
+    assert "revoke_security_group_ingress" in out and "drift(s) gone" in out
+
+
+def test_remediate_dry_run(capsys):
+    code, out, _ = run(capsys, "remediate", "--dry-run", "--scenario", "open-all-app")
+    assert code == 0 and "dry run" in out and "validated" in out
+
+
+def test_remediate_unknown_drift_id(capsys):
+    code, _, err = run(capsys, "remediate", "--drift-id", "nope")
+    assert code == 1 and "nope" in err
+
+
+def test_remediate_no_drift(capsys):
+    code, out, _ = run(capsys, "remediate", "--scenario", "shadow-sg")
+    assert code == 0
+
+
+def test_remediate_manual_requires_both(capsys):
+    code, _, err = run(capsys, "remediate", "--sg-id", "sg-123")
+    assert code == 2 and "--rule" in err
+
+
+def test_remediate_manual_bad_rule(capsys):
+    code, _, err = run(capsys, "remediate", "--sg-id", "sg-123", "--rule", "garbage")
+    assert code == 2
+
+
+def test_remediate_manual_dry_run(capsys):
+    code, out, _ = run(capsys, "remediate", "--sg-id", "sg-123", "--rule", "0.0.0.0/0:22/tcp")
+    assert code == 0 and "GroupId='sg-123'" in out and "not executed" in out
+
+
+def test_remediate_live_requires_yes(capsys):
+    code, _, err = run(capsys, "remediate", "--live")
+    assert code == 2 and "--yes" in err
+    code, _, err = run(capsys, "remediate", "--live", "--sg-id", "sg-1", "--rule", "0.0.0.0/0:22/tcp")
+    assert code == 2 and "--yes" in err
+
+
+def test_report_live_requires_yes(capsys, tmp_path):
+    code, _, err = run(capsys, "report", "--live", "--output", str(tmp_path / "x.pdf"))
+    assert code == 2 and "--yes" in err
+
+
+def test_report_simulated(capsys, tmp_path):
+    out_pdf = tmp_path / "r.pdf"
+    code, out, _ = run(capsys, "report", "--output", str(out_pdf))
+    assert code == 0 and out_pdf.exists()
+    text = "".join(p.extract_text() for p in PdfReader(str(out_pdf)).pages)
+    assert "revoke_security_group_ingress" in text
+
+
+def test_report_no_execute(capsys, tmp_path):
+    out_pdf = tmp_path / "n.pdf"
+    code, _, _ = run(capsys, "report", "--no-execute", "--output", str(out_pdf))
+    assert code == 0 and out_pdf.exists()
+
+
+def test_daemon_history_diff_and_report_from_db(capsys, tmp_path):
+    db = str(tmp_path / "h.db")
+    pdf = tmp_path / "d.pdf"
+    code, out, _ = run(capsys, "daemon", "--db", db, "--interval", "0.3", "--duration", "3",
+                       "--inject", "open-db", "--inject-after", "0.6", "--report", str(pdf))
+    assert code == 0 and pdf.exists()
+
+    code, out, _ = run(capsys, "history", "--db", db)
+    assert code == 0 and "baseline" in out and "public_db_exposure" in out
+
+    code, out, _ = run(capsys, "diff", "baseline", "latest", "--db", db, "--json")
+    assert code == 0
+    payload = json.loads(out)
+    assert payload["diff"]["newly_exposed"] == []  # healed: no net exposure vs baseline
+
+    code, out, _ = run(capsys, "diff", "baseline", "--db", db)
+    assert code == 0
+
+    pdf2 = tmp_path / "from_db.pdf"
+    code, out, _ = run(capsys, "report", "--from-db", db, "--output", str(pdf2))
+    assert code == 0 and pdf2.exists()
+
+
+def test_daemon_no_heal_leaves_drift(capsys, tmp_path):
+    db = str(tmp_path / "n.db")
+    code, out, _ = run(capsys, "daemon", "--db", db, "--no-heal", "--cycles", "2", "--interval", "0.1",
+                       "--scenario", "open-ssh")
+    assert code == 0
+
+
+def test_history_empty_db(capsys, tmp_path):
+    code, out, _ = run(capsys, "history", "--db", str(tmp_path / "empty.db"))
+    assert code == 0 and "No snapshots yet" in out
+
+
+def test_diff_missing_snapshot(capsys, tmp_path):
+    code, _, err = run(capsys, "diff", "baseline", "--db", str(tmp_path / "empty.db"))
+    assert code == 1 and err
+
+
+def test_report_from_empty_db(capsys, tmp_path):
+    code, out, _ = run(capsys, "report", "--from-db", str(tmp_path / "e.db"), "--output", str(tmp_path / "e.pdf"))
+    assert code == 0 and "No incidents" in out
+
+
+def test_mid_review_demo(capsys):
+    code, out, _ = run(capsys, "mid-review-demo")
+    assert code == 0 and "PASS" in out.upper()
+
+
+def test_self_heal_demo(capsys):
+    code, out, _ = run(capsys, "self-heal-demo", "--scenario", "open-db")
+    assert code == 0 and "revoke_security_group_ingress" in out
+
+
+def test_final_demo(capsys, tmp_path):
+    pdf = tmp_path / "final.pdf"
+    code, out, _ = run(capsys, "final-demo", "--output", str(pdf), "--db", str(tmp_path / "f.db"))
+    assert code == 0 and pdf.exists()
