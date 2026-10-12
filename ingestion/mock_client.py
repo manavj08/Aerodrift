@@ -8,7 +8,6 @@ def get_mock_ec2_state() -> tuple[list[Resource], list[Relationship]]:
     """Spins up fake EC2 infra via moto and returns it as Resource/Relationship objects."""
     ec2 = boto3.client("ec2", region_name="us-east-1")
 
-    # Create a security group with an open SSH rule (deliberately risky, for drift testing later)
     sg = ec2.create_security_group(GroupName="open-sg", Description="test sg")
     sg_id = sg["GroupId"]
     ec2.authorize_security_group_ingress(
@@ -21,22 +20,47 @@ def get_mock_ec2_state() -> tuple[list[Resource], list[Relationship]]:
         }],
     )
 
-    # Create an instance attached to that security group
-    instance = ec2.run_instances(
+    ec2.run_instances(
         ImageId="ami-12345678",
         MinCount=1,
         MaxCount=1,
         InstanceType="t2.micro",
         SecurityGroupIds=[sg_id],
     )
-    instance_id = instance["Instances"][0]["InstanceId"]
 
     resources = [
-        Resource(sg_id, "SecurityGroup", {"ingress": "0.0.0.0/0:22"}),
-        Resource(instance_id, "EC2Instance", {"instance_type": "t2.micro"}),
+        Resource("sg-web", "SecurityGroup", {"ingress": "0.0.0.0/0:22"}),
+        Resource("i-web", "EC2Instance", {"instance_type": "t2.micro"}),
     ]
     relationships = [
-        Relationship(instance_id, sg_id, "ATTACHED_TO"),
+        Relationship("i-web", "sg-web", "ATTACHED_TO"),
+    ]
+    return resources, relationships
+
+
+@mock_aws
+def get_mock_ec2_state_fixed() -> tuple[list[Resource], list[Relationship]]:
+    """Same as get_mock_ec2_state, but with the SG ingress rule removed (post-remediation)."""
+    ec2 = boto3.client("ec2", region_name="us-east-1")
+
+    sg = ec2.create_security_group(GroupName="closed-sg", Description="test sg (fixed)")
+    sg_id = sg["GroupId"]
+    # No open ingress rule added this time, which simulates the fix
+
+    ec2.run_instances(
+        ImageId="ami-12345678",
+        MinCount=1,
+        MaxCount=1,
+        InstanceType="t2.micro",
+        SecurityGroupIds=[sg_id],
+    )
+
+    resources = [
+        Resource("sg-web", "SecurityGroup", {"ingress": "none"}),
+        Resource("i-web", "EC2Instance", {"instance_type": "t2.micro"}),
+    ]
+    relationships = [
+        Relationship("i-web", "sg-web", "ATTACHED_TO"),
     ]
     return resources, relationships
 
